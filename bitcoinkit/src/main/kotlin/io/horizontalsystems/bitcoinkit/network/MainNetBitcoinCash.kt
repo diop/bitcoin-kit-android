@@ -28,14 +28,14 @@ class MainNetBitcoinCash : Network() {
             "seeder.criptolayer.net"                // criptolayer.net
     )
 
-    private val blockHeader = Header().apply {
-        version = 549453824
-        prevHash = HashUtils.toBytesAsLE("000000000000000002e4009667ba236d52f605cd44c12ebd79208c14b520968e")
-        merkleHash = HashUtils.toBytesAsLE("65822e3caa2a4709abd37df7de6464a58830da0f8e308af44586114e1c73914f")
-        timestamp = 1551084121
-        bits = 403013590
-        nonce = 2244691553
-    }
+    private val blockHeader = Header(
+            549453824,
+            HashUtils.toBytesAsLE("000000000000000002e4009667ba236d52f605cd44c12ebd79208c14b520968e"),
+            HashUtils.toBytesAsLE("65822e3caa2a4709abd37df7de6464a58830da0f8e308af44586114e1c73914f"),
+            1551084121,
+            403013590,
+            2244691553,
+            this)
 
     override val checkpointBlock = Block(blockHeader, 571268)
     override val blockValidator = BitcoinCashValidator(this)

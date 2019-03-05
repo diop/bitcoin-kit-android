@@ -27,14 +27,14 @@ class TestNet : Network() {
             "bitcoin-testnet.bloqseeds.net"          // Bloq
     )
 
-    private val blockHeader = Header().apply {
-        version = 2079170560
-        prevHash = HashUtils.toBytesAsLE("00000000000007524a71cc81cadbd1ddf9d38848fa8081ad2a72eade4b70d1c1")
-        merkleHash = HashUtils.toBytesAsLE("975b76235d1a9b97fbf4a4f203a762728fb404d568dd33921e328e2d5a712c46")
-        timestamp = 1550688527
-        bits = 436465680
-        nonce = 489544448
-    }
+    private val blockHeader = Header(
+            2079170560,
+            HashUtils.toBytesAsLE("00000000000007524a71cc81cadbd1ddf9d38848fa8081ad2a72eade4b70d1c1"),
+            HashUtils.toBytesAsLE("975b76235d1a9b97fbf4a4f203a762728fb404d568dd33921e328e2d5a712c46"),
+            1550688527,
+            436465680,
+            489544448,
+            this)
 
     override val checkpointBlock = Block(blockHeader, 1479744)
     override val blockValidator = TestnetValidator(this)

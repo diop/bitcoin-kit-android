@@ -2,6 +2,7 @@ package io.horizontalsystems.bitcoinkit.network.messages
 
 import io.horizontalsystems.bitcoinkit.io.BitcoinInput
 import io.horizontalsystems.bitcoinkit.models.Header
+import io.horizontalsystems.bitcoinkit.network.Network
 import io.horizontalsystems.bitcoinkit.utils.HashUtils
 import java.io.ByteArrayInputStream
 
@@ -16,7 +17,7 @@ import java.io.ByteArrayInputStream
  *  VarInt      flagsCount      Number of bytes of flag bits
  *  Variable    flagsBits       Flag bits packed 8 per byte, least significant bit first
  */
-class MerkleBlockMessage() : Message("merkleblock") {
+class MerkleBlockMessage(payload: ByteArray, network: Network) : Message("merkleblock") {
 
     lateinit var header: Header
     var txCount: Int = 0
@@ -28,12 +29,12 @@ class MerkleBlockMessage() : Message("merkleblock") {
     var flags: ByteArray = byteArrayOf()
 
     private val blockHash: String by lazy {
-        HashUtils.toHexStringAsLE(HashUtils.doubleSha256(header.toByteArray()))
+        HashUtils.toHexStringAsLE(header.hash)
     }
 
-    constructor(payload: ByteArray) : this() {
+    init {
         BitcoinInput(ByteArrayInputStream(payload)).use { input ->
-            header = Header(input)
+            header = Header(input, network)
             txCount = input.readInt()
 
             hashCount = input.readVarInt().toInt()

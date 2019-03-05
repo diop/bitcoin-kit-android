@@ -32,29 +32,6 @@ abstract class Message(cmd: String) {
 
     object Builder {
 
-        private val msgMap = initMessages()
-
-        private fun initMessages(): Map<String, Class<*>> {
-            val map = HashMap<String, Class<*>>()
-            map["addr"] = AddrMessage::class.java
-            map["block"] = BlockMessage::class.java
-            map["getaddr"] = GetAddrMessage::class.java
-            map["getblocks"] = GetBlocksMessage::class.java
-            map["getdata"] = GetDataMessage::class.java
-            map["getheaders"] = GetHeadersMessage::class.java
-            map["inv"] = InvMessage::class.java
-            map["ping"] = PingMessage::class.java
-            map["pong"] = PongMessage::class.java
-            map["verack"] = VerAckMessage::class.java
-            map["version"] = VersionMessage::class.java
-            map["headers"] = HeadersMessage::class.java
-            map["merkleblock"] = MerkleBlockMessage::class.java
-            map["tx"] = TransactionMessage::class.java
-            map["filterload"] = FilterLoadMessage::class.java
-
-            return map
-        }
-
         /**
          * Parse stream as message.
          */
@@ -78,11 +55,22 @@ abstract class Message(cmd: String) {
                 throw BitcoinException("Checksum failed.")
             }
 
-            // build msg:
-            val msgClass = msgMap[command] ?: return UnknownMessage(command, payload) as T
             try {
-                val constructor = msgClass.getConstructor(ByteArray::class.java)
-                return constructor.newInstance(payload) as T
+                return when (command) {
+                    "merkleblock" -> MerkleBlockMessage(payload, network)
+                    "addr" -> AddrMessage(payload)
+                    "getaddr" -> GetAddrMessage(payload)
+                    "getblocks" -> GetBlocksMessage(payload)
+                    "getdata" -> GetDataMessage(payload)
+                    "getheaders" -> GetHeadersMessage(payload)
+                    "inv" -> InvMessage(payload)
+                    "ping" -> PingMessage(payload)
+                    "pong" -> PongMessage(payload)
+                    "verack" -> VerAckMessage(payload)
+                    "version" -> VersionMessage(payload)
+                    "tx" -> TransactionMessage(payload)
+                    else -> UnknownMessage(command, payload)
+                } as T
             } catch (e: Exception) {
                 throw RuntimeException(e)
             }

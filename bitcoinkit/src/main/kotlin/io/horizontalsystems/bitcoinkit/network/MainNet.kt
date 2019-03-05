@@ -29,14 +29,14 @@ class MainNet : Network() {
             "seed.bitcoin.sprovoost.nl"         // Sjors Provoost
     )
 
-    private val blockHeader = Header().apply {
-        version = 536870912
-        prevHash = HashUtils.toBytesAsLE("00000000000000000017e5c36734296b27065045f181e028c0d91cebb336d50c")
-        merkleHash = HashUtils.toBytesAsLE("2f9963d6eb332a0dd03ad806f504981e6180226dbca4385dc801db8974b2c17b")
-        timestamp = 1551026038
-        bits = 388914000
-        nonce = 1427093839
-    }
+    private val blockHeader = Header(
+            536870912,
+            HashUtils.toBytesAsLE("00000000000000000017e5c36734296b27065045f181e028c0d91cebb336d50c"),
+            HashUtils.toBytesAsLE("2f9963d6eb332a0dd03ad806f504981e6180226dbca4385dc801db8974b2c17b"),
+            1551026038,
+            388914000,
+            1427093839,
+            this)
 
     override val checkpointBlock = Block(blockHeader, 564480)
     override val blockValidator = BlockValidator(this)

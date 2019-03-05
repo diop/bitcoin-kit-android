@@ -7,6 +7,8 @@ import io.reactivex.Observable
 class ApiFeeRate(networkType: NetworkType) {
     private val apiManager = ApiManager("https://ipfs.horizontalsystems.xyz")
     private val resource = when (networkType) {
+        NetworkType.MainNetDash -> "DASH"
+        NetworkType.TestNetDash -> "DASH/testnet"
         NetworkType.MainNet -> "BTC"
         NetworkType.TestNet -> "BTC/testnet"
         NetworkType.RegTest -> "BTC/regtest"

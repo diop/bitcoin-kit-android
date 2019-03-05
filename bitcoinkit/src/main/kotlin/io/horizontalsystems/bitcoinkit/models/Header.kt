@@ -2,9 +2,8 @@ package io.horizontalsystems.bitcoinkit.models
 
 import io.horizontalsystems.bitcoinkit.io.BitcoinInput
 import io.horizontalsystems.bitcoinkit.io.BitcoinOutput
-import io.horizontalsystems.bitcoinkit.utils.HashUtils
+import io.horizontalsystems.bitcoinkit.network.Network
 import io.realm.RealmObject
-import io.realm.annotations.Ignore
 import java.io.IOException
 
 /**
@@ -39,21 +38,31 @@ open class Header : RealmObject {
     // Uint32, The nonce used to generate this block to allow variations of the header and compute different hashes
     var nonce: Long = 0
 
-    @delegate:Ignore
-    val hash: ByteArray by lazy {
-        HashUtils.doubleSha256(toByteArray())
-    }
+    var hash: ByteArray = byteArrayOf()
 
     constructor()
 
+    constructor(version: Int, prevHash: ByteArray, merkleHash: ByteArray, timestamp: Long, bits: Long, nonce: Long, network: Network) {
+        this.version = version
+        this.prevHash = prevHash
+        this.merkleHash = merkleHash
+        this.timestamp = timestamp
+        this.bits = bits
+        this.nonce = nonce
+
+        hash = network.generateBlockHeaderHash(toByteArray())
+    }
+
     @Throws(IOException::class)
-    constructor(input: BitcoinInput) {
+    constructor(input: BitcoinInput, network: Network) {
         version = input.readInt()
         prevHash = input.readBytes(32)
         merkleHash = input.readBytes(32)
         timestamp = input.readUnsignedInt()
         bits = input.readUnsignedInt()
         nonce = input.readUnsignedInt()
+
+        hash = network.generateBlockHeaderHash(toByteArray())
     }
 
     fun toByteArray(): ByteArray {

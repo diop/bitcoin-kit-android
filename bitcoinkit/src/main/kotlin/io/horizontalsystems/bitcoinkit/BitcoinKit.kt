@@ -101,8 +101,10 @@ class BitcoinKitBuilder {
         val network: Network = when (networkType) {
             BitcoinKit.NetworkType.MainNet -> MainNet()
             BitcoinKit.NetworkType.MainNetBitCash -> MainNetBitcoinCash()
+            BitcoinKit.NetworkType.MainNetDash -> MainNetDash()
             BitcoinKit.NetworkType.TestNet -> TestNet()
             BitcoinKit.NetworkType.TestNetBitCash -> TestNetBitcoinCash()
+            BitcoinKit.NetworkType.TestNetDash -> TestNetDash()
             BitcoinKit.NetworkType.RegTest -> RegTest()
         }
 
@@ -143,6 +145,8 @@ class BitcoinKitBuilder {
         val transactionCreator = TransactionCreator(realmFactory, transactionBuilder, transactionProcessor, peerGroup)
 
         val paymentAddressParser = when (networkType) {
+            BitcoinKit.NetworkType.MainNetDash,
+            BitcoinKit.NetworkType.TestNetDash,
             BitcoinKit.NetworkType.MainNet,
             BitcoinKit.NetworkType.TestNet,
             BitcoinKit.NetworkType.RegTest -> {
@@ -155,6 +159,8 @@ class BitcoinKitBuilder {
         }
 
         val addressSelector: IAddressSelector = when (networkType) {
+            BitcoinKit.NetworkType.MainNetDash,
+            BitcoinKit.NetworkType.TestNetDash,
             BitcoinKit.NetworkType.MainNet,
             BitcoinKit.NetworkType.TestNet,
             BitcoinKit.NetworkType.RegTest -> {
@@ -328,7 +334,9 @@ class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFa
         TestNet,
         RegTest,
         MainNetBitCash,
-        TestNetBitCash
+        TestNetBitCash,
+        MainNetDash,
+        TestNetDash
     }
 
     sealed class KitState {
