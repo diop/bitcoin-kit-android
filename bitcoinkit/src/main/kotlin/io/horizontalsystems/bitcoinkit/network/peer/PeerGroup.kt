@@ -26,6 +26,9 @@ class PeerGroup(
     var transactionSyncer: TransactionSyncer? = null
     var connectionManager: ConnectionManager? = null
 
+    var inventoryItemsHandler: IInventoryItemsHandler? = null
+    var peerTaskHandler: IPeerTaskHandler? = null
+
     @Volatile
     private var running = false
     private val logger = Logger.getLogger("PeerGroup")
@@ -153,6 +156,8 @@ class PeerGroup(
         if (transactionHashes.isNotEmpty()) {
             peer.addTask(RequestTransactionsTask(transactionHashes))
         }
+
+        inventoryItemsHandler?.handleInventoryItems(peer, inventoryItems)
     }
 
     override fun onReceiveMerkleBlock(peer: Peer, merkleBlock: MerkleBlock) {
@@ -191,7 +196,7 @@ class PeerGroup(
             is SendTransactionTask -> {
                 transactionSyncer?.handleTransaction(task.transaction)
             }
-            else -> throw Exception("Task not handled: $task")
+            else -> peerTaskHandler?.handleCompletedTask(peer, task)
         }
     }
 

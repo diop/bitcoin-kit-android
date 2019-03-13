@@ -111,6 +111,7 @@ class Peer(val host: String, private val network: Network, private val listener:
                     }
                 }
             }
+            else -> tasks.any { it.handleMessage(message) }
         }
     }
 

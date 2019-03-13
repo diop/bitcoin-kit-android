@@ -5,6 +5,7 @@ import android.arch.lifecycle.ViewModel
 import io.horizontalsystems.bitcoinkit.BitcoinKit
 import io.horizontalsystems.bitcoinkit.BitcoinKit.KitState
 import io.horizontalsystems.bitcoinkit.BitcoinKitBuilder
+import io.horizontalsystems.bitcoinkit.dash.DashKit
 import io.horizontalsystems.bitcoinkit.models.BlockInfo
 import io.horizontalsystems.bitcoinkit.models.TransactionInfo
 import io.reactivex.disposables.CompositeDisposable
@@ -37,11 +38,14 @@ class MainViewModel : ViewModel(), BitcoinKit.Listener {
         bitcoinKit = BitcoinKitBuilder()
                 .setContext(App.instance)
                 .setWords(words)
-                .setNetworkType(BitcoinKit.NetworkType.TestNet)
+                .setNetworkType(BitcoinKit.NetworkType.TestNetDash)
                 .setWalletId("wallet-id")
                 .build()
 
         bitcoinKit.listener = this
+
+        val dashKit = DashKit()
+        dashKit.init(bitcoinKit)
 
         networkName = BitcoinKit.NetworkType.TestNet.name
         balance.value = bitcoinKit.balance

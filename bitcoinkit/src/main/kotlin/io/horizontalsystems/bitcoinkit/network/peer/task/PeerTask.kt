@@ -4,6 +4,7 @@ import io.horizontalsystems.bitcoinkit.models.Header
 import io.horizontalsystems.bitcoinkit.models.InventoryItem
 import io.horizontalsystems.bitcoinkit.models.MerkleBlock
 import io.horizontalsystems.bitcoinkit.models.Transaction
+import io.horizontalsystems.bitcoinkit.network.messages.Message
 import java.util.*
 
 open class PeerTask {
@@ -67,6 +68,10 @@ open class PeerTask {
 
     fun resetTimer() {
         lastActiveTime = Date().time
+    }
+
+    open fun handleMessage(message: Message): Boolean {
+        return false
     }
 
 }

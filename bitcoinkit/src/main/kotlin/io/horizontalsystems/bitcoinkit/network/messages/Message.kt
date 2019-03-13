@@ -31,12 +31,13 @@ abstract class Message(cmd: String) {
     }
 
     object Builder {
+        var messageParser: IMessageParser? = null
 
         /**
          * Parse stream as message.
          */
         @Throws(IOException::class)
-        fun <T : Message> parseMessage(input: BitcoinInput, network: Network): T {
+        fun parseMessage(input: BitcoinInput, network: Network): Message {
             val magic = input.readUnsignedInt()
             if (magic != network.magic) {
                 throw BitcoinException("Bad magic. (local) ${network.magic}!=$magic")
@@ -56,21 +57,7 @@ abstract class Message(cmd: String) {
             }
 
             try {
-                return when (command) {
-                    "merkleblock" -> MerkleBlockMessage(payload, network)
-                    "addr" -> AddrMessage(payload)
-                    "getaddr" -> GetAddrMessage(payload)
-                    "getblocks" -> GetBlocksMessage(payload)
-                    "getdata" -> GetDataMessage(payload)
-                    "getheaders" -> GetHeadersMessage(payload)
-                    "inv" -> InvMessage(payload)
-                    "ping" -> PingMessage(payload)
-                    "pong" -> PongMessage(payload)
-                    "verack" -> VerAckMessage(payload)
-                    "version" -> VersionMessage(payload)
-                    "tx" -> TransactionMessage(payload)
-                    else -> UnknownMessage(command, payload)
-                } as T
+                return messageParser?.parseMessage(command, payload, network) ?: UnknownMessage(command, payload)
             } catch (e: Exception) {
                 throw RuntimeException(e)
             }
