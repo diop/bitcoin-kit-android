@@ -12,6 +12,8 @@ import io.horizontalsystems.bitcoinkit.network.Network
 import io.horizontalsystems.bitcoinkit.network.peer.task.*
 import io.horizontalsystems.bitcoinkit.transactions.TransactionSyncer
 import java.net.InetAddress
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.BlockingQueue
 import java.util.concurrent.Executors
 import java.util.logging.Logger
 
@@ -34,6 +36,8 @@ class PeerGroup(
     private val logger = Logger.getLogger("PeerGroup")
     private val peersQueue = Executors.newSingleThreadExecutor()
     private val peerManager = PeerManager()
+
+    private val taskQueue: BlockingQueue<PeerTask> = ArrayBlockingQueue(10)
 
     init {
         bloomFilterManager.listener = this
@@ -109,6 +113,11 @@ class PeerGroup(
     override fun onReady(peer: Peer) {
         peersQueue.execute {
             downloadBlockchain()
+
+//            todo check if peer is not syncPeer
+            taskQueue.firstOrNull()?.let {
+                peer.addTask(it)
+            }
         }
     }
 
@@ -288,6 +297,18 @@ class PeerGroup(
 
     private fun isRequestingInventory(hash: ByteArray): Boolean {
         return peerManager.connected().any { peer -> peer.isRequestingInventory(hash) }
+    }
+
+    fun addTask(peerTask: PeerTask) {
+        // todo find better solution
+        val peer = peerManager.someReadyPeers().firstOrNull()
+
+        if (peer == null) {
+            taskQueue.add(peerTask)
+        } else {
+            peer.addTask(peerTask)
+        }
+
     }
 
     //

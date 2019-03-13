@@ -1,7 +1,5 @@
-package io.horizontalsystems.bitcoinkit.dash
+package io.horizontalsystems.bitcoinkit.dash.messages
 
-import io.horizontalsystems.bitcoinkit.dash.messages.TransactionLockMessage
-import io.horizontalsystems.bitcoinkit.dash.messages.TransactionLockVoteMessage
 import io.horizontalsystems.bitcoinkit.network.Network
 import io.horizontalsystems.bitcoinkit.network.messages.IMessageParser
 import io.horizontalsystems.bitcoinkit.network.messages.Message
@@ -13,6 +11,7 @@ class DashMessageParser : IMessageParser {
         return when (command) {
             "ix" -> TransactionLockMessage(payload)
             "txlvote" -> TransactionLockVoteMessage(payload)
+            "mnlistdiff" -> MasternodeListDiffMessage(payload)
             else -> nextParser?.parseMessage(command, payload, network)
         }
     }

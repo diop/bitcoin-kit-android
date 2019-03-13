@@ -201,6 +201,10 @@ class Peer(val host: String, private val network: Network, private val listener:
         peerConnection.sendMessage(TransactionMessage(transaction))
     }
 
+    override fun sendMessage(message: Message) {
+        peerConnection.sendMessage(message)
+    }
+
     //
     // Private methods
     //

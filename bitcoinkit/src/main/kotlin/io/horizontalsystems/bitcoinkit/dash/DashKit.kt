@@ -1,11 +1,19 @@
 package io.horizontalsystems.bitcoinkit.dash
 
+import android.content.Context
 import android.util.Log
 import io.horizontalsystems.bitcoinkit.BitcoinKit
+import io.horizontalsystems.bitcoinkit.core.hexStringToByteArray
 import io.horizontalsystems.bitcoinkit.core.toHexString
+import io.horizontalsystems.bitcoinkit.dash.managers.MasternodeListManager
+import io.horizontalsystems.bitcoinkit.dash.managers.MasternodeListSyncer
+import io.horizontalsystems.bitcoinkit.dash.messages.DashMessageParser
+import io.horizontalsystems.bitcoinkit.dash.tasks.PeerTaskFactory
 import io.horizontalsystems.bitcoinkit.dash.tasks.RequestTransactionLockRequestsTask
 import io.horizontalsystems.bitcoinkit.dash.tasks.RequestTransactionLockVotesTask
+import io.horizontalsystems.bitcoinkit.models.BlockInfo
 import io.horizontalsystems.bitcoinkit.models.InventoryItem
+import io.horizontalsystems.bitcoinkit.models.TransactionInfo
 import io.horizontalsystems.bitcoinkit.network.messages.BitcoinMessageParser
 import io.horizontalsystems.bitcoinkit.network.messages.IMessageParser
 import io.horizontalsystems.bitcoinkit.network.messages.Message
@@ -14,21 +22,100 @@ import io.horizontalsystems.bitcoinkit.network.peer.IPeerTaskHandler
 import io.horizontalsystems.bitcoinkit.network.peer.Peer
 import io.horizontalsystems.bitcoinkit.network.peer.task.PeerTask
 import io.horizontalsystems.bitcoinkit.transactions.TransactionSyncer
+import io.horizontalsystems.hdwalletkit.Mnemonic
+import io.reactivex.Single
 
-class DashKit {
+class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.NetworkType, walletId: String, peerSize: Int = 10, newWallet: Boolean = false, confirmationsThreshold: Int = 6) : BitcoinKit.Listener {
 
-    fun init(bitcoinKit: BitcoinKit) {
-        val configurator = DashConfigurator()
-        val instantSend = InstantSend(bitcoinKit.peerGroup.transactionSyncer)
-
-        Message.Builder.messageParser = configurator.getMessageParser()
-        bitcoinKit.peerGroup.inventoryItemsHandler = instantSend
-        bitcoinKit.peerGroup.peerTaskHandler = instantSend
+    interface Listener {
+        fun onTransactionsUpdate(inserted: List<TransactionInfo>, updated: List<TransactionInfo>)
+        fun onTransactionsDelete(hashes: List<String>)
+        fun onBalanceUpdate(balance: Long)
+        fun onLastBlockInfoUpdate(blockInfo: BlockInfo)
+        fun onKitStateUpdate(state: BitcoinKit.KitState)
     }
 
+    private val bitcoinKit = BitcoinKit(context, seed, networkType, walletId, peerSize, newWallet, confirmationsThreshold)
+    var listener: Listener? = null
+    val balance get() = bitcoinKit.balance
+    val lastBlockInfo get() = bitcoinKit.lastBlockInfo
+    private val masterNodeSyncer = MasternodeListSyncer(bitcoinKit.peerGroup, PeerTaskFactory(), MasternodeListManager())
+
+    constructor(context: Context, words: List<String>, networkType: BitcoinKit.NetworkType, walletId: String, peerSize: Int = 10, newWallet: Boolean = false, confirmationsThreshold: Int = 6) :
+            this(context, Mnemonic().toSeed(words), networkType, walletId, peerSize, newWallet, confirmationsThreshold)
+
+    init {
+        bitcoinKit.listener = this
+
+        val configurator = DashConfigurator(bitcoinKit.peerGroup.transactionSyncer, masterNodeSyncer)
+
+        Message.Builder.messageParser = configurator.getMessageParser()
+        bitcoinKit.peerGroup.inventoryItemsHandler = configurator.getInventoryItemsHandler()
+        bitcoinKit.peerGroup.peerTaskHandler = configurator.getPeerTaskHandler()
+    }
+
+    fun transactions(fromHash: String? = null, limit: Int? = null): Single<List<TransactionInfo>> {
+        return bitcoinKit.transactions(fromHash, limit)
+    }
+
+    fun start() {
+        bitcoinKit.start()
+    }
+
+    fun clear() {
+        bitcoinKit.clear()
+    }
+
+    fun receiveAddress(): String {
+        return bitcoinKit.receiveAddress()
+    }
+
+    fun send(address: String, value: Long, senderPay: Boolean = true) {
+        bitcoinKit.send(address, value, senderPay)
+    }
+
+    fun fee(value: Long, address: String? = null, senderPay: Boolean = true): Long {
+        return bitcoinKit.fee(value, address, senderPay)
+    }
+
+    fun showDebugInfo() {
+        bitcoinKit.showDebugInfo()
+    }
+
+    override fun onTransactionsUpdate(bitcoinKit: BitcoinKit, inserted: List<TransactionInfo>, updated: List<TransactionInfo>) {
+        listener?.onTransactionsUpdate(inserted, updated)
+    }
+
+    override fun onTransactionsDelete(hashes: List<String>) {
+        listener?.onTransactionsDelete(hashes)
+    }
+
+    override fun onBalanceUpdate(bitcoinKit: BitcoinKit, balance: Long) {
+        listener?.onBalanceUpdate(balance)
+    }
+
+    override fun onLastBlockInfoUpdate(bitcoinKit: BitcoinKit, blockInfo: BlockInfo) {
+        if (bitcoinKit.syncState == BitcoinKit.KitState.Synced) {
+            masterNodeSyncer.sync(blockInfo.headerHash.hexStringToByteArray().reversedArray())
+        }
+
+        listener?.onLastBlockInfoUpdate(blockInfo)
+    }
+
+    override fun onKitStateUpdate(bitcoinKit: BitcoinKit, state: BitcoinKit.KitState) {
+        if (state == BitcoinKit.KitState.Synced) {
+            bitcoinKit.lastBlockInfo?.let {
+                masterNodeSyncer.sync(it.headerHash.hexStringToByteArray().reversedArray())
+            }
+        }
+
+        listener?.onKitStateUpdate(state)
+    }
 }
 
 class InstantSend(private val transactionSyncer: TransactionSyncer?) : IInventoryItemsHandler, IPeerTaskHandler {
+
+    override var nextHandler: IPeerTaskHandler? = null
 
     override fun handleInventoryItems(peer: Peer, inventoryItems: List<InventoryItem>) {
         val transactionLockRequests = mutableListOf<ByteArray>()
@@ -65,18 +152,31 @@ class InstantSend(private val transactionSyncer: TransactionSyncer?) : IInventor
                     Log.e("AAA", "Received tx lock vote for tx: ${it.txHash.reversedArray().toHexString()}")
                 }
             }
+            else -> nextHandler?.handleCompletedTask(peer, task)
         }
     }
 
 }
 
-class DashConfigurator {
+class DashConfigurator(transactionSyncer: TransactionSyncer?, private val masternodeSyncer: MasternodeListSyncer) {
+
+    val instantSend = InstantSend(transactionSyncer)
 
     fun getMessageParser(): IMessageParser {
         val dashMessageParser = DashMessageParser()
         dashMessageParser.nextParser = BitcoinMessageParser()
 
         return dashMessageParser
+    }
+
+    fun getPeerTaskHandler(): IPeerTaskHandler {
+        masternodeSyncer.nextHandler = instantSend
+        return masternodeSyncer
+
+    }
+
+    fun getInventoryItemsHandler(): IInventoryItemsHandler {
+        return instantSend
     }
 
 }

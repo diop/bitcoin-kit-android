@@ -21,6 +21,7 @@ open class PeerTask {
         fun getData(items: List<InventoryItem>)
         fun sendTransactionInventory(hash: ByteArray)
         fun send(transaction: Transaction)
+        fun sendMessage(message: Message)
     }
 
     var requester: Requester? = null
