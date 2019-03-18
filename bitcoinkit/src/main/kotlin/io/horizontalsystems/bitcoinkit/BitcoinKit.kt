@@ -35,6 +35,8 @@ class BitcoinKitModule
 
 class BitcoinKitBuilder {
 
+    var peerGroup: PeerGroup? = null
+
     // required parameters
     private var context: Context? = null
     private var seed: ByteArray? = null
@@ -109,9 +111,7 @@ class BitcoinKitBuilder {
         }
 
         val dbName = "bitcoinkit-${networkType.name}-$walletId"
-
         val database = KitDatabase.getInstance(context, dbName)
-
         val realmFactory = RealmFactory(dbName)
         val storage = Storage(database, realmFactory)
 
@@ -195,6 +195,8 @@ class BitcoinKitBuilder {
 
         dataProvider.listener = bitcoinKit
         kitStateProvider.listener = bitcoinKit
+
+        this.peerGroup = peerGroup
 
         return bitcoinKit
     }

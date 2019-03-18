@@ -3,6 +3,7 @@ package io.horizontalsystems.bitcoinkit.dash
 import android.content.Context
 import android.util.Log
 import io.horizontalsystems.bitcoinkit.BitcoinKit
+import io.horizontalsystems.bitcoinkit.BitcoinKitBuilder
 import io.horizontalsystems.bitcoinkit.core.hexStringToByteArray
 import io.horizontalsystems.bitcoinkit.core.toHexString
 import io.horizontalsystems.bitcoinkit.dash.managers.MasternodeListManager
@@ -35,23 +36,42 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
         fun onKitStateUpdate(state: BitcoinKit.KitState)
     }
 
-    private val bitcoinKit = BitcoinKit(context, seed, networkType, walletId, peerSize, newWallet, confirmationsThreshold)
+    private val bitcoinKit: BitcoinKit
     var listener: Listener? = null
     val balance get() = bitcoinKit.balance
     val lastBlockInfo get() = bitcoinKit.lastBlockInfo
-    private val masterNodeSyncer = MasternodeListSyncer(bitcoinKit.peerGroup, PeerTaskFactory(), MasternodeListManager())
+    private var masterNodeSyncer: MasternodeListSyncer? = null
 
     constructor(context: Context, words: List<String>, networkType: BitcoinKit.NetworkType, walletId: String, peerSize: Int = 10, newWallet: Boolean = false, confirmationsThreshold: Int = 6) :
             this(context, Mnemonic().toSeed(words), networkType, walletId, peerSize, newWallet, confirmationsThreshold)
 
     init {
+        val builder = BitcoinKitBuilder()
+                .setContext(context)
+                .setSeed(seed)
+                .setNetworkType(networkType)
+                .setWalletId(walletId)
+                .setPeerSize(peerSize)
+                .setNewWallet(newWallet)
+                .setConfirmationThreshold(confirmationsThreshold)
+
+        bitcoinKit = builder
+                .build()
+
         bitcoinKit.listener = this
 
-        val configurator = DashConfigurator(bitcoinKit.peerGroup.transactionSyncer, masterNodeSyncer)
+        builder.peerGroup?.let { peerGroup ->
+            MasternodeListSyncer(peerGroup, PeerTaskFactory(), MasternodeListManager()).let {
+                val configurator = DashConfigurator(peerGroup.transactionSyncer, it)
 
-        Message.Builder.messageParser = configurator.getMessageParser()
-        bitcoinKit.peerGroup.inventoryItemsHandler = configurator.getInventoryItemsHandler()
-        bitcoinKit.peerGroup.peerTaskHandler = configurator.getPeerTaskHandler()
+                Message.Builder.messageParser = configurator.getMessageParser()
+                peerGroup.inventoryItemsHandler = configurator.getInventoryItemsHandler()
+                peerGroup.peerTaskHandler = configurator.getPeerTaskHandler()
+
+                masterNodeSyncer = it
+            }
+        }
+
     }
 
     fun transactions(fromHash: String? = null, limit: Int? = null): Single<List<TransactionInfo>> {
@@ -96,7 +116,7 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
 
     override fun onLastBlockInfoUpdate(bitcoinKit: BitcoinKit, blockInfo: BlockInfo) {
         if (bitcoinKit.syncState == BitcoinKit.KitState.Synced) {
-            masterNodeSyncer.sync(blockInfo.headerHash.hexStringToByteArray().reversedArray())
+            masterNodeSyncer?.sync(blockInfo.headerHash.hexStringToByteArray().reversedArray())
         }
 
         listener?.onLastBlockInfoUpdate(blockInfo)
@@ -105,7 +125,7 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
     override fun onKitStateUpdate(bitcoinKit: BitcoinKit, state: BitcoinKit.KitState) {
         if (state == BitcoinKit.KitState.Synced) {
             bitcoinKit.lastBlockInfo?.let {
-                masterNodeSyncer.sync(it.headerHash.hexStringToByteArray().reversedArray())
+                masterNodeSyncer?.sync(it.headerHash.hexStringToByteArray().reversedArray())
             }
         }
 

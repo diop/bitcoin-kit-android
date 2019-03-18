@@ -38,7 +38,7 @@ class MainViewModel : ViewModel(), DashKit.Listener {
         dashKit = DashKit(App.instance, words, networkType, "wallet-id", newWallet = true)
         dashKit.listener = this
 
-        networkName = BitcoinKit.NetworkType.TestNet.name
+        networkName = networkType.name
         balance.value = dashKit.balance
 
         dashKit.transactions().subscribe { txList: List<TransactionInfo> ->
