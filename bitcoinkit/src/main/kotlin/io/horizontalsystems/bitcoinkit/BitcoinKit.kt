@@ -3,6 +3,7 @@ package io.horizontalsystems.bitcoinkit
 import android.content.Context
 import io.horizontalsystems.bitcoinkit.blocks.BlockSyncer
 import io.horizontalsystems.bitcoinkit.blocks.Blockchain
+import io.horizontalsystems.bitcoinkit.blocks.InitialBlockDownload
 import io.horizontalsystems.bitcoinkit.core.DataProvider
 import io.horizontalsystems.bitcoinkit.core.KitStateProvider
 import io.horizontalsystems.bitcoinkit.core.RealmFactory
@@ -142,12 +143,16 @@ class BitcoinKitBuilder {
 
         val transactionSender = TransactionSender()
 
-        val peerGroup = PeerGroup(peerHostManager, bloomFilterManager, network, kitStateProvider, peerSize)
-        peerGroup.blockSyncer = BlockSyncer(storage, Blockchain(network, dataProvider), transactionProcessor, addressManager, bloomFilterManager, kitStateProvider, network)
+        val peerManager = PeerManager()
+
+        val initialBlockDownload = InitialBlockDownload(BlockSyncer(storage, Blockchain(network, dataProvider), transactionProcessor, addressManager, bloomFilterManager, kitStateProvider, network), peerManager, kitStateProvider)
+        initialBlockDownload.peersSyncedListener = SendTransactionsOnPeersSynced(transactionSender)
+
+        val peerGroup = PeerGroup(peerHostManager, bloomFilterManager, network, peerManager, peerSize)
         peerGroup.connectionManager = connectionManager
-        peerGroup.peersSyncedListener = SendTransactionsOnPeersSynced(transactionSender)
         peerGroup.peerTaskHandler = peerTaskHandlerChain
         peerGroup.inventoryItemsHandler = inventoryItemsHandlerChain
+        peerGroup.peerGroupListener = initialBlockDownload
 
         val transactionBuilder = TransactionBuilder(realmFactory, addressConverter, hdWallet, network, addressManager, unspentOutputProvider)
         val transactionCreator = TransactionCreator(realmFactory, transactionBuilder, transactionProcessor, transactionSender)
@@ -214,9 +219,9 @@ class BitcoinKitBuilder {
         val transactionXxx = TransactionXxx(peerGroup, transactionSyncer!!)
 
         peerTaskHandlerChain.addHandler(transactionXxx)
+        peerTaskHandlerChain.addHandler(initialBlockDownload)
         inventoryItemsHandlerChain.addHandler(transactionXxx)
-
-
+        inventoryItemsHandlerChain.addHandler(initialBlockDownload)
 
         return bitcoinKit
     }

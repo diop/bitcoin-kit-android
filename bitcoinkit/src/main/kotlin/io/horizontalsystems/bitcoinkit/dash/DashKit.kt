@@ -48,7 +48,7 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
                 .setSeed(seed)
                 .setNetworkType(networkType)
                 .setWalletId(walletId)
-                .setPeerSize(1)
+//                .setPeerSize(1)
                 .setNewWallet(newWallet)
                 .setConfirmationThreshold(confirmationsThreshold)
 

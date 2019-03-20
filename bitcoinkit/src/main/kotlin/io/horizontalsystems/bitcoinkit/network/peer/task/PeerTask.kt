@@ -12,7 +12,6 @@ open class PeerTask {
     interface Listener {
         fun onTaskCompleted(task: PeerTask)
         fun onTaskFailed(task: PeerTask, e: Exception)
-        fun handleMerkleBlock(merkleBlock: MerkleBlock)
     }
 
     interface Requester {

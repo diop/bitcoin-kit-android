@@ -131,7 +131,7 @@ class BlockSyncer(
     }
 
     fun shouldRequest(blockHash: ByteArray): Boolean {
-        return storage.getBlock(blockHash) != null
+        return storage.getBlock(blockHash) == null
     }
 
     private fun clearPartialBlocks() {

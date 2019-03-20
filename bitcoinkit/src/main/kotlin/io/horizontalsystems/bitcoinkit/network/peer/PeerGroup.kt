@@ -1,16 +1,11 @@
 package io.horizontalsystems.bitcoinkit.network.peer
 
-import io.horizontalsystems.bitcoinkit.blocks.BlockSyncer
-import io.horizontalsystems.bitcoinkit.core.ISyncStateListener
 import io.horizontalsystems.bitcoinkit.crypto.BloomFilter
 import io.horizontalsystems.bitcoinkit.managers.BloomFilterManager
 import io.horizontalsystems.bitcoinkit.managers.ConnectionManager
 import io.horizontalsystems.bitcoinkit.models.InventoryItem
-import io.horizontalsystems.bitcoinkit.models.MerkleBlock
 import io.horizontalsystems.bitcoinkit.models.NetworkAddress
 import io.horizontalsystems.bitcoinkit.network.Network
-import io.horizontalsystems.bitcoinkit.network.peer.task.GetBlockHashesTask
-import io.horizontalsystems.bitcoinkit.network.peer.task.GetMerkleBlocksTask
 import io.horizontalsystems.bitcoinkit.network.peer.task.PeerTask
 import java.net.InetAddress
 import java.util.concurrent.ArrayBlockingQueue
@@ -22,20 +17,29 @@ class PeerGroup(
         private val hostManager: PeerAddressManager,
         private val bloomFilterManager: BloomFilterManager,
         private val network: Network,
-        private val syncStateListener: ISyncStateListener,
+        private val peerManager: PeerManager,
         private val peerSize: Int) : Thread(), Peer.Listener, BloomFilterManager.Listener {
 
-    var blockSyncer: BlockSyncer? = null
+    interface PeerGroupListener {
+        fun onStart()
+        fun onStop()
+        fun onPeerCreate(peer: Peer)
+        fun onPeerConnect(peer: Peer)
+        fun onPeerDisconnect(peer: Peer, e: Exception?)
+        fun onPeerReady(peer: Peer)
+    }
+
     var connectionManager: ConnectionManager? = null
 
     var inventoryItemsHandler: IInventoryItemsHandler? = null
     var peerTaskHandler: IPeerTaskHandler? = null
 
+    var peerGroupListener: PeerGroupListener? = null
+
     @Volatile
     private var running = false
     private val logger = Logger.getLogger("PeerGroup")
     private val peersQueue = Executors.newSingleThreadExecutor()
-    private val peerManager = PeerManager()
 
     private val taskQueue: BlockingQueue<PeerTask> = ArrayBlockingQueue(10)
 
@@ -46,6 +50,7 @@ class PeerGroup(
     fun someReadyPeers(): List<Peer> {
         return peerManager.someReadyPeers()
     }
+
     @Throws
     fun checkPeersSynced() {
         if (peerManager.peersCount() < 1) {
@@ -73,8 +78,7 @@ class PeerGroup(
     override fun run() {
         running = true
 
-        syncStateListener.onSyncStart()
-        blockSyncer?.prepareForDownload()
+        peerGroupListener?.onStart()
 
         while (running) {
             if (connectionManager?.isOnline == true && peerManager.peersCount() < peerSize) {
@@ -88,8 +92,7 @@ class PeerGroup(
             }
         }
 
-        syncStateListener.onSyncStop()
-        blockSyncer = null
+        peerGroupListener?.onStop()
         logger.info("Closing all peer connections...")
 
         peerManager.disconnectAll()
@@ -105,12 +108,12 @@ class PeerGroup(
             peer.filterLoad(it)
         }
 
-        assignNextSyncPeer()
+        peerGroupListener?.onPeerConnect(peer)
     }
 
     override fun onReady(peer: Peer) {
         peersQueue.execute {
-            downloadBlockchain()
+            peerGroupListener?.onPeerReady(peer)
 
 //            todo check if peer is not syncPeer
             taskQueue.poll()?.let {
@@ -130,39 +133,12 @@ class PeerGroup(
             hostManager.markFailed(peer.host)
         }
 
-        if (peerManager.isSyncPeer(peer)) {
-            peerManager.syncPeer = null
-            blockSyncer?.downloadFailed()
-            assignNextSyncPeer()
-        }
+        peerGroupListener?.onPeerDisconnect(peer, e)
+
     }
 
     override fun onReceiveInventoryItems(peer: Peer, inventoryItems: List<InventoryItem>) {
-        val blockHashes = mutableListOf<ByteArray>()
-
-        inventoryItems.forEach { item ->
-            when (item.type) {
-                InventoryItem.MSG_BLOCK -> if (blockSyncer?.shouldRequest(item.hash) == true) {
-                    blockHashes.add(item.hash)
-                }
-            }
-        }
-
-        if (blockHashes.isNotEmpty() && peer.synced) {
-            peer.synced = false
-            peer.blockHashesSynced = false
-            assignNextSyncPeer()
-        }
-
         inventoryItemsHandler?.handleInventoryItems(peer, inventoryItems)
-    }
-
-    override fun onReceiveMerkleBlock(peer: Peer, merkleBlock: MerkleBlock) {
-        try {
-            blockSyncer?.handleMerkleBlock(merkleBlock, peer.announcedLastBlockHeight)
-        } catch (e: Exception) {
-            peer.close(e)
-        }
     }
 
     override fun onReceiveAddress(addrs: Array<NetworkAddress>) {
@@ -176,19 +152,7 @@ class PeerGroup(
     }
 
     override fun onTaskComplete(peer: Peer, task: PeerTask) {
-        when (task) {
-            is GetBlockHashesTask -> {
-                if (task.blockHashes.isEmpty()) {
-                    peer.blockHashesSynced = true
-                } else {
-                    blockSyncer?.addBlockHashes(task.blockHashes)
-                }
-            }
-            is GetMerkleBlocksTask -> {
-                blockSyncer?.downloadIterationCompleted()
-            }
-            else -> peerTaskHandler?.handleCompletedTask(peer, task)
-        }
+        peerTaskHandler?.handleCompletedTask(peer, task)
     }
 
     //
@@ -209,58 +173,10 @@ class PeerGroup(
         if (ip != null) {
             logger.info("Try open new peer connection to $ip...")
             val peer = Peer(ip, network, this)
-            peer.localBestBlockHeight = blockSyncer?.localDownloadedBestBlockHeight ?: 0
+            peerGroupListener?.onPeerCreate(peer)
             peer.start()
         } else {
             logger.info("No peers found yet.")
-        }
-    }
-
-    var peersSyncedListener: IAllPeersSyncedListener? = null
-
-    private fun assignNextSyncPeer() {
-        peersQueue.execute {
-            if (peerManager.syncPeer == null) {
-                val nonSyncedPeer = peerManager.nonSyncedPeer()
-                if (nonSyncedPeer == null) {
-                    peersSyncedListener?.onAllPeersSynced()
-                } else {
-                    peerManager.syncPeer = nonSyncedPeer
-                    blockSyncer?.downloadStarted()
-
-                    logger.info("Start syncing peer ${nonSyncedPeer.host}")
-
-                    downloadBlockchain()
-                }
-            }
-        }
-    }
-
-    private fun downloadBlockchain() {
-        peerManager.syncPeer?.let { syncPeer ->
-            blockSyncer?.let { blockSyncer ->
-
-                val blockHashes = blockSyncer.getBlockHashes()
-                if (blockHashes.isEmpty()) {
-                    syncPeer.synced = syncPeer.blockHashesSynced
-                } else {
-                    syncPeer.addTask(GetMerkleBlocksTask(blockHashes))
-                }
-
-                if (!syncPeer.blockHashesSynced) {
-                    val expectedHashesMinCount = Math.max(syncPeer.announcedLastBlockHeight - blockSyncer.localKnownBestBlockHeight, 0)
-                    syncPeer.addTask(GetBlockHashesTask(blockSyncer.getBlockLocatorHashes(syncPeer.announcedLastBlockHeight), expectedHashesMinCount))
-                }
-
-                if (syncPeer.synced) {
-                    blockSyncer.downloadCompleted()
-                    syncStateListener.onSyncFinish()
-                    syncPeer.sendMempoolMessage()
-                    logger.info("Peer synced ${syncPeer.host}")
-                    peerManager.syncPeer = null
-                    assignNextSyncPeer()
-                }
-            }
         }
     }
 
