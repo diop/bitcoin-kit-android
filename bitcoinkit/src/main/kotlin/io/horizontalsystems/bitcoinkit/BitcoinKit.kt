@@ -13,8 +13,10 @@ import io.horizontalsystems.bitcoinkit.models.BlockInfo
 import io.horizontalsystems.bitcoinkit.models.PublicKey
 import io.horizontalsystems.bitcoinkit.models.TransactionInfo
 import io.horizontalsystems.bitcoinkit.network.*
-import io.horizontalsystems.bitcoinkit.network.peer.PeerAddressManager
-import io.horizontalsystems.bitcoinkit.network.peer.PeerGroup
+import io.horizontalsystems.bitcoinkit.network.messages.BitcoinMessageParser
+import io.horizontalsystems.bitcoinkit.network.messages.IMessageParser
+import io.horizontalsystems.bitcoinkit.network.messages.Message
+import io.horizontalsystems.bitcoinkit.network.peer.*
 import io.horizontalsystems.bitcoinkit.storage.KitDatabase
 import io.horizontalsystems.bitcoinkit.storage.Storage
 import io.horizontalsystems.bitcoinkit.transactions.*
@@ -89,6 +91,8 @@ class BitcoinKitBuilder {
         return this
     }
 
+    var transactionSyncer: TransactionSyncer? = null
+
     fun build(): BitcoinKit {
         val context = this.context
         val seed = this.seed ?: words?.let { Mnemonic().toSeed(it) }
@@ -136,13 +140,17 @@ class BitcoinKitBuilder {
         val peerHostManager = PeerAddressManager(network, storage)
         val bloomFilterManager = BloomFilterManager(realmFactory)
 
+        val transactionSender = TransactionSender()
+
         val peerGroup = PeerGroup(peerHostManager, bloomFilterManager, network, kitStateProvider, peerSize)
         peerGroup.blockSyncer = BlockSyncer(storage, Blockchain(network, dataProvider), transactionProcessor, addressManager, bloomFilterManager, kitStateProvider, network)
-        peerGroup.transactionSyncer = TransactionSyncer(storage, transactionProcessor, addressManager, bloomFilterManager)
         peerGroup.connectionManager = connectionManager
+        peerGroup.peersSyncedListener = SendTransactionsOnPeersSynced(transactionSender)
+        peerGroup.peerTaskHandler = peerTaskHandlerChain
+        peerGroup.inventoryItemsHandler = inventoryItemsHandlerChain
 
         val transactionBuilder = TransactionBuilder(realmFactory, addressConverter, hdWallet, network, addressManager, unspentOutputProvider)
-        val transactionCreator = TransactionCreator(realmFactory, transactionBuilder, transactionProcessor, peerGroup)
+        val transactionCreator = TransactionCreator(realmFactory, transactionBuilder, transactionProcessor, transactionSender)
 
         val paymentAddressParser = when (networkType) {
             BitcoinKit.NetworkType.MainNetDash,
@@ -198,7 +206,36 @@ class BitcoinKitBuilder {
 
         this.peerGroup = peerGroup
 
+
+        // this part can be moved to another place
+
+        transactionSyncer = TransactionSyncer(storage, transactionProcessor, addressManager, bloomFilterManager)
+
+        val transactionXxx = TransactionXxx(peerGroup, transactionSyncer!!)
+
+        peerTaskHandlerChain.addHandler(transactionXxx)
+        inventoryItemsHandlerChain.addHandler(transactionXxx)
+
+
+
         return bitcoinKit
+    }
+
+    private val inventoryItemsHandlerChain = InventoryItemsHandlerChain()
+    private val peerTaskHandlerChain = PeerTaskHandlerChain()
+
+    fun addMessageParser(messageParser: IMessageParser) {
+        messageParser.nextParser = BitcoinMessageParser()
+
+        Message.Builder.messageParser = messageParser
+    }
+
+    fun addInventoryItemsHandler(handler: IInventoryItemsHandler) {
+        inventoryItemsHandlerChain.addHandler(handler)
+    }
+
+    fun addPeerTaskHandler(handler: IPeerTaskHandler) {
+        peerTaskHandlerChain.addHandler(handler)
     }
 
 }

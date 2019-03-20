@@ -15,9 +15,6 @@ import io.horizontalsystems.bitcoinkit.dash.tasks.RequestTransactionLockVotesTas
 import io.horizontalsystems.bitcoinkit.models.BlockInfo
 import io.horizontalsystems.bitcoinkit.models.InventoryItem
 import io.horizontalsystems.bitcoinkit.models.TransactionInfo
-import io.horizontalsystems.bitcoinkit.network.messages.BitcoinMessageParser
-import io.horizontalsystems.bitcoinkit.network.messages.IMessageParser
-import io.horizontalsystems.bitcoinkit.network.messages.Message
 import io.horizontalsystems.bitcoinkit.network.peer.IInventoryItemsHandler
 import io.horizontalsystems.bitcoinkit.network.peer.IPeerTaskHandler
 import io.horizontalsystems.bitcoinkit.network.peer.Peer
@@ -51,26 +48,25 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
                 .setSeed(seed)
                 .setNetworkType(networkType)
                 .setWalletId(walletId)
-                .setPeerSize(peerSize)
+                .setPeerSize(1)
                 .setNewWallet(newWallet)
                 .setConfirmationThreshold(confirmationsThreshold)
 
         bitcoinKit = builder
                 .build()
 
+
+        val instantSend = InstantSend(builder.transactionSyncer)
+
+        val masterNodeSyncer = MasternodeListSyncer(builder.peerGroup!!, PeerTaskFactory(), MasternodeListManager())
+
+        builder.addMessageParser(DashMessageParser())
+        builder.addInventoryItemsHandler(instantSend)
+        builder.addPeerTaskHandler(masterNodeSyncer)
+        builder.addPeerTaskHandler(instantSend)
+
         bitcoinKit.listener = this
 
-        builder.peerGroup?.let { peerGroup ->
-            MasternodeListSyncer(peerGroup, PeerTaskFactory(), MasternodeListManager()).let {
-                val configurator = DashConfigurator(peerGroup.transactionSyncer, it)
-
-                Message.Builder.messageParser = configurator.getMessageParser()
-                peerGroup.inventoryItemsHandler = configurator.getInventoryItemsHandler()
-                peerGroup.peerTaskHandler = configurator.getPeerTaskHandler()
-
-                masterNodeSyncer = it
-            }
-        }
 
     }
 
@@ -135,8 +131,6 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
 
 class InstantSend(private val transactionSyncer: TransactionSyncer?) : IInventoryItemsHandler, IPeerTaskHandler {
 
-    override var nextHandler: IPeerTaskHandler? = null
-
     override fun handleInventoryItems(peer: Peer, inventoryItems: List<InventoryItem>) {
         val transactionLockRequests = mutableListOf<ByteArray>()
         val transactionLockVotes = mutableListOf<ByteArray>()
@@ -162,41 +156,20 @@ class InstantSend(private val transactionSyncer: TransactionSyncer?) : IInventor
 
     }
 
-    override fun handleCompletedTask(peer: Peer, task: PeerTask) {
-        when (task) {
+    override fun handleCompletedTask(peer: Peer, task: PeerTask): Boolean {
+        return when (task) {
             is RequestTransactionLockRequestsTask -> {
                 transactionSyncer?.handleTransactions(task.transactions)
+                true
             }
             is RequestTransactionLockVotesTask -> {
                 task.transactionLockVotes.forEach {
                     Log.e("AAA", "Received tx lock vote for tx: ${it.txHash.reversedArray().toHexString()}")
                 }
+                true
             }
-            else -> nextHandler?.handleCompletedTask(peer, task)
+            else -> false
         }
-    }
-
-}
-
-class DashConfigurator(transactionSyncer: TransactionSyncer?, private val masternodeSyncer: MasternodeListSyncer) {
-
-    val instantSend = InstantSend(transactionSyncer)
-
-    fun getMessageParser(): IMessageParser {
-        val dashMessageParser = DashMessageParser()
-        dashMessageParser.nextParser = BitcoinMessageParser()
-
-        return dashMessageParser
-    }
-
-    fun getPeerTaskHandler(): IPeerTaskHandler {
-        masternodeSyncer.nextHandler = instantSend
-        return masternodeSyncer
-
-    }
-
-    fun getInventoryItemsHandler(): IInventoryItemsHandler {
-        return instantSend
     }
 
 }

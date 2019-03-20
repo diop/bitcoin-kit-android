@@ -9,14 +9,12 @@ import io.horizontalsystems.bitcoinkit.network.peer.task.PeerTask
 
 class MasternodeListSyncer(private val peerGroup: PeerGroup, val peerTaskFactory: PeerTaskFactory, private val masternodeListManager: MasternodeListManager) : IPeerTaskHandler {
 
-    override var nextHandler: IPeerTaskHandler? = null
-
     fun sync(blockHash: ByteArray) {
         addTask(masternodeListManager.getBaseBlockHash(), blockHash)
     }
 
-    override fun handleCompletedTask(peer: Peer, task: PeerTask) {
-        when (task) {
+    override fun handleCompletedTask(peer: Peer, task: PeerTask): Boolean {
+        return when (task) {
             is RequestMasternodeListDiffTask -> {
                 task.masternodeListDiffMessage?.let { masternodeListDiffMessage ->
                     try {
@@ -27,8 +25,9 @@ class MasternodeListSyncer(private val peerGroup: PeerGroup, val peerTaskFactory
                         addTask(masternodeListDiffMessage.baseBlockHash, masternodeListDiffMessage.blockHash)
                     }
                 }
+                true
             }
-            else -> nextHandler?.handleCompletedTask(peer, task)
+            else -> false
         }
     }
 

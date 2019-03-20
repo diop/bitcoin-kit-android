@@ -9,8 +9,9 @@ import io.horizontalsystems.bitcoinkit.models.InventoryItem
 import io.horizontalsystems.bitcoinkit.models.MerkleBlock
 import io.horizontalsystems.bitcoinkit.models.NetworkAddress
 import io.horizontalsystems.bitcoinkit.network.Network
-import io.horizontalsystems.bitcoinkit.network.peer.task.*
-import io.horizontalsystems.bitcoinkit.transactions.TransactionSyncer
+import io.horizontalsystems.bitcoinkit.network.peer.task.GetBlockHashesTask
+import io.horizontalsystems.bitcoinkit.network.peer.task.GetMerkleBlocksTask
+import io.horizontalsystems.bitcoinkit.network.peer.task.PeerTask
 import java.net.InetAddress
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.BlockingQueue
@@ -25,7 +26,6 @@ class PeerGroup(
         private val peerSize: Int) : Thread(), Peer.Listener, BloomFilterManager.Listener {
 
     var blockSyncer: BlockSyncer? = null
-    var transactionSyncer: TransactionSyncer? = null
     var connectionManager: ConnectionManager? = null
 
     var inventoryItemsHandler: IInventoryItemsHandler? = null
@@ -43,11 +43,9 @@ class PeerGroup(
         bloomFilterManager.listener = this
     }
 
-    @Throws
-    fun sendPendingTransactions() {
-        handlePendingTransactions()
+    fun someReadyPeers(): List<Peer> {
+        return peerManager.someReadyPeers()
     }
-
     @Throws
     fun checkPeersSynced() {
         if (peerManager.peersCount() < 1) {
@@ -115,7 +113,7 @@ class PeerGroup(
             downloadBlockchain()
 
 //            todo check if peer is not syncPeer
-            taskQueue.firstOrNull()?.let {
+            taskQueue.poll()?.let {
                 peer.addTask(it)
             }
         }
@@ -141,17 +139,11 @@ class PeerGroup(
 
     override fun onReceiveInventoryItems(peer: Peer, inventoryItems: List<InventoryItem>) {
         val blockHashes = mutableListOf<ByteArray>()
-        val transactionHashes = mutableListOf<ByteArray>()
 
         inventoryItems.forEach { item ->
             when (item.type) {
                 InventoryItem.MSG_BLOCK -> if (blockSyncer?.shouldRequest(item.hash) == true) {
                     blockHashes.add(item.hash)
-                }
-                InventoryItem.MSG_TX -> {
-                    if (!isRequestingInventory(item.hash) && transactionSyncer?.shouldRequestTransaction(item.hash) == true) {
-                        transactionHashes.add(item.hash)
-                    }
                 }
             }
         }
@@ -160,10 +152,6 @@ class PeerGroup(
             peer.synced = false
             peer.blockHashesSynced = false
             assignNextSyncPeer()
-        }
-
-        if (transactionHashes.isNotEmpty()) {
-            peer.addTask(RequestTransactionsTask(transactionHashes))
         }
 
         inventoryItemsHandler?.handleInventoryItems(peer, inventoryItems)
@@ -199,12 +187,6 @@ class PeerGroup(
             is GetMerkleBlocksTask -> {
                 blockSyncer?.downloadIterationCompleted()
             }
-            is RequestTransactionsTask -> {
-                transactionSyncer?.handleTransactions(task.transactions)
-            }
-            is SendTransactionTask -> {
-                transactionSyncer?.handleTransaction(task.transaction)
-            }
             else -> peerTaskHandler?.handleCompletedTask(peer, task)
         }
     }
@@ -234,16 +216,14 @@ class PeerGroup(
         }
     }
 
+    var peersSyncedListener: IAllPeersSyncedListener? = null
+
     private fun assignNextSyncPeer() {
         peersQueue.execute {
             if (peerManager.syncPeer == null) {
                 val nonSyncedPeer = peerManager.nonSyncedPeer()
                 if (nonSyncedPeer == null) {
-                    try {
-                        handlePendingTransactions()
-                    } catch (e: PeerGroup.Error) {
-                        logger.warning("Handling pending transactions failed with: ${e.message}")
-                    }
+                    peersSyncedListener?.onAllPeersSynced()
                 } else {
                     peerManager.syncPeer = nonSyncedPeer
                     blockSyncer?.downloadStarted()
@@ -284,18 +264,7 @@ class PeerGroup(
         }
     }
 
-    @Throws
-    private fun handlePendingTransactions() {
-        checkPeersSynced()
-
-        peerManager.someReadyPeers().forEach { peer ->
-            transactionSyncer?.getPendingTransactions()?.forEach { pendingTransaction ->
-                peer.addTask(SendTransactionTask(pendingTransaction))
-            }
-        }
-    }
-
-    private fun isRequestingInventory(hash: ByteArray): Boolean {
+    fun isRequestingInventory(hash: ByteArray): Boolean {
         return peerManager.connected().any { peer -> peer.isRequestingInventory(hash) }
     }
 

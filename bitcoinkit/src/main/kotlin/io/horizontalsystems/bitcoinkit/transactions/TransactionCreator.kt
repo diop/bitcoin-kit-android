@@ -2,18 +2,18 @@ package io.horizontalsystems.bitcoinkit.transactions
 
 import io.horizontalsystems.bitcoinkit.core.RealmFactory
 import io.horizontalsystems.bitcoinkit.models.Transaction
-import io.horizontalsystems.bitcoinkit.network.peer.PeerGroup
+import io.horizontalsystems.bitcoinkit.network.peer.TransactionSender
 import io.horizontalsystems.bitcoinkit.transactions.builder.TransactionBuilder
 
 class TransactionCreator(
         private val realmFactory: RealmFactory,
         private val builder: TransactionBuilder,
         private val processor: TransactionProcessor,
-        private val peerGroup: PeerGroup) {
+        private val transactionSender: TransactionSender) {
 
     @Throws
     fun create(address: String, value: Long, feeRate: Int, senderPay: Boolean) {
-        peerGroup.checkPeersSynced()
+        transactionSender.canSendTransaction()
 
         realmFactory.realm.use { realm ->
             val transaction = builder.buildTransaction(value, address, feeRate, senderPay, realm)
@@ -25,7 +25,7 @@ class TransactionCreator(
             processor.processOutgoing(transaction, realm)
         }
 
-        peerGroup.sendPendingTransactions()
+        transactionSender.sendPendingTransactions()
     }
 
     open class TransactionCreationException(msg: String) : Exception(msg)
