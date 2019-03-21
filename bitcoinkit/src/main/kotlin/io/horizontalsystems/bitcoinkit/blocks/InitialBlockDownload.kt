@@ -60,6 +60,7 @@ class InitialBlockDownload(private var blockSyncer: BlockSyncer?,
 
     override fun onStop() {
         syncStateListener.onSyncStop()
+        // set blockSyncer to null to make sure that there won't be any further interaction with blockSyncer
         blockSyncer = null
     }
 
