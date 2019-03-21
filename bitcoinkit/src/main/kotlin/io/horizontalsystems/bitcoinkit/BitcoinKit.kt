@@ -38,7 +38,8 @@ class BitcoinKitModule
 
 class BitcoinKitBuilder {
 
-    var peerGroup: PeerGroup? = null
+    lateinit var peerGroup: PeerGroup
+    lateinit var transactionSyncer: TransactionSyncer
 
     // required parameters
     private var context: Context? = null
@@ -91,8 +92,6 @@ class BitcoinKitBuilder {
         this.peerSize = peerSize
         return this
     }
-
-    var transactionSyncer: TransactionSyncer? = null
 
     fun build(): BitcoinKit {
         val context = this.context
@@ -148,7 +147,12 @@ class BitcoinKitBuilder {
         peerGroup.peerTaskHandler = peerTaskHandlerChain
         peerGroup.inventoryItemsHandler = inventoryItemsHandlerChain
 
+        val transactionSyncer = TransactionSyncer(storage, transactionProcessor, addressManager, bloomFilterManager)
+
         val transactionSender = TransactionSender()
+        transactionSender.peerGroup = peerGroup
+        transactionSender.transactionSyncer = transactionSyncer
+
         val transactionBuilder = TransactionBuilder(realmFactory, addressConverter, hdWallet, network, addressManager, unspentOutputProvider)
         val transactionCreator = TransactionCreator(realmFactory, transactionBuilder, transactionProcessor, transactionSender)
 
@@ -205,14 +209,9 @@ class BitcoinKitBuilder {
         kitStateProvider.listener = bitcoinKit
 
         this.peerGroup = peerGroup
-
+        this.transactionSyncer = transactionSyncer
 
         // this part can be moved to another place
-
-        transactionSyncer = TransactionSyncer(storage, transactionProcessor, addressManager, bloomFilterManager)
-
-        transactionSender.peerGroup = peerGroup
-        transactionSender.transactionSyncer = transactionSyncer
 
         val initialBlockDownload = InitialBlockDownload(BlockSyncer(storage, Blockchain(network, dataProvider), transactionProcessor, addressManager, bloomFilterManager, kitStateProvider, network), peerManager, kitStateProvider)
         peerTaskHandlerChain.addHandler(initialBlockDownload)
@@ -220,7 +219,7 @@ class BitcoinKitBuilder {
         peerGroup.addPeerGroupListener(initialBlockDownload)
         initialBlockDownload.peersSyncedListener = SendTransactionsOnPeersSynced(transactionSender)
 
-        val mempoolTransactions = MempoolTransactions(transactionSyncer!!)
+        val mempoolTransactions = MempoolTransactions(transactionSyncer)
         peerTaskHandlerChain.addHandler(mempoolTransactions)
         inventoryItemsHandlerChain.addHandler(mempoolTransactions)
         peerGroup.addPeerGroupListener(mempoolTransactions)

@@ -52,13 +52,11 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
                 .setNewWallet(newWallet)
                 .setConfirmationThreshold(confirmationsThreshold)
 
-        bitcoinKit = builder
-                .build()
-
+        bitcoinKit = builder.build()
 
         builder.addMessageParser(DashMessageParser())
 
-        val masterNodeSyncer = MasternodeListSyncer(builder.peerGroup!!, PeerTaskFactory(), MasternodeListManager())
+        val masterNodeSyncer = MasternodeListSyncer(builder.peerGroup, PeerTaskFactory(), MasternodeListManager())
         builder.addPeerTaskHandler(masterNodeSyncer)
 
         val instantSend = InstantSend(builder.transactionSyncer)
