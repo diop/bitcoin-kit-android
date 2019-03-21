@@ -214,14 +214,14 @@ class BitcoinKitBuilder {
         // this part can be moved to another place
 
         val initialBlockDownload = InitialBlockDownload(BlockSyncer(storage, Blockchain(network, dataProvider), transactionProcessor, addressManager, bloomFilterManager, kitStateProvider, network), peerManager, kitStateProvider)
-        peerTaskHandlerChain.addHandler(initialBlockDownload)
-        inventoryItemsHandlerChain.addHandler(initialBlockDownload)
+        addPeerTaskHandler(initialBlockDownload)
+        addInventoryItemsHandler(initialBlockDownload)
         peerGroup.addPeerGroupListener(initialBlockDownload)
         initialBlockDownload.peersSyncedListener = SendTransactionsOnPeersSynced(transactionSender)
 
         val mempoolTransactions = MempoolTransactions(transactionSyncer)
-        peerTaskHandlerChain.addHandler(mempoolTransactions)
-        inventoryItemsHandlerChain.addHandler(mempoolTransactions)
+        addPeerTaskHandler(mempoolTransactions)
+        addInventoryItemsHandler(mempoolTransactions)
         peerGroup.addPeerGroupListener(mempoolTransactions)
 
         return bitcoinKit
