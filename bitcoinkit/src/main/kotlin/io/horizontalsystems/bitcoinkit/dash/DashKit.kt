@@ -48,7 +48,7 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
                 .setSeed(seed)
                 .setNetworkType(networkType)
                 .setWalletId(walletId)
-//                .setPeerSize(1)
+                .setPeerSize(2)
                 .setNewWallet(newWallet)
                 .setConfirmationThreshold(confirmationsThreshold)
 
@@ -56,18 +56,16 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
                 .build()
 
 
-        val instantSend = InstantSend(builder.transactionSyncer)
+        builder.addMessageParser(DashMessageParser())
 
         val masterNodeSyncer = MasternodeListSyncer(builder.peerGroup!!, PeerTaskFactory(), MasternodeListManager())
-
-        builder.addMessageParser(DashMessageParser())
-        builder.addInventoryItemsHandler(instantSend)
         builder.addPeerTaskHandler(masterNodeSyncer)
+
+        val instantSend = InstantSend(builder.transactionSyncer)
+        builder.addInventoryItemsHandler(instantSend)
         builder.addPeerTaskHandler(instantSend)
 
         bitcoinKit.listener = this
-
-
     }
 
     fun transactions(fromHash: String? = null, limit: Int? = null): Single<List<TransactionInfo>> {

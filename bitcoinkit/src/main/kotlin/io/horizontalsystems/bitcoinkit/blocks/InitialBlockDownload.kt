@@ -13,7 +13,7 @@ import java.util.logging.Logger
 class InitialBlockDownload(private var blockSyncer: BlockSyncer?,
                            private val peerManager: PeerManager,
                            private val syncStateListener: ISyncStateListener
-) : IInventoryItemsHandler, IPeerTaskHandler, GetMerkleBlocksTask.MerkleBlockHandler, PeerGroup.PeerGroupListener {
+) : IInventoryItemsHandler, IPeerTaskHandler, PeerGroup.IPeerGroupListener, GetMerkleBlocksTask.MerkleBlockHandler {
 
     var peersSyncedListener: IAllPeersSyncedListener? = null
 
@@ -23,17 +23,7 @@ class InitialBlockDownload(private var blockSyncer: BlockSyncer?,
     private val logger = Logger.getLogger("IBD")
 
     override fun handleInventoryItems(peer: Peer, inventoryItems: List<InventoryItem>) {
-        val blockHashes = mutableListOf<ByteArray>()
-
-        inventoryItems.forEach { item ->
-            when (item.type) {
-                InventoryItem.MSG_BLOCK -> if (blockSyncer?.shouldRequest(item.hash) == true) {
-                    blockHashes.add(item.hash)
-                }
-            }
-        }
-
-        if (blockHashes.isNotEmpty() && peer.synced) {
+        if (peer.synced && inventoryItems.any { it.type == InventoryItem.MSG_BLOCK }) {
             peer.synced = false
             peer.blockHashesSynced = false
             assignNextSyncPeer()

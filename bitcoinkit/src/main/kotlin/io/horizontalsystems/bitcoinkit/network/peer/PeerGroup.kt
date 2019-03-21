@@ -20,13 +20,13 @@ class PeerGroup(
         private val peerManager: PeerManager,
         private val peerSize: Int) : Thread(), Peer.Listener, BloomFilterManager.Listener {
 
-    interface PeerGroupListener {
-        fun onStart()
-        fun onStop()
-        fun onPeerCreate(peer: Peer)
-        fun onPeerConnect(peer: Peer)
-        fun onPeerDisconnect(peer: Peer, e: Exception?)
-        fun onPeerReady(peer: Peer)
+    interface IPeerGroupListener {
+        fun onStart() = Unit
+        fun onStop() = Unit
+        fun onPeerCreate(peer: Peer) = Unit
+        fun onPeerConnect(peer: Peer) = Unit
+        fun onPeerDisconnect(peer: Peer, e: Exception?) = Unit
+        fun onPeerReady(peer: Peer) = Unit
     }
 
     var connectionManager: ConnectionManager? = null
@@ -34,17 +34,19 @@ class PeerGroup(
     var inventoryItemsHandler: IInventoryItemsHandler? = null
     var peerTaskHandler: IPeerTaskHandler? = null
 
-    var peerGroupListener: PeerGroupListener? = null
-
     @Volatile
     private var running = false
     private val logger = Logger.getLogger("PeerGroup")
     private val peersQueue = Executors.newSingleThreadExecutor()
-
     private val taskQueue: BlockingQueue<PeerTask> = ArrayBlockingQueue(10)
+    private val peerGroupListeners = mutableListOf<IPeerGroupListener>()
 
     init {
         bloomFilterManager.listener = this
+    }
+
+    fun addPeerGroupListener(listener: IPeerGroupListener) {
+        peerGroupListeners.add(listener)
     }
 
     fun someReadyPeers(): List<Peer> {
@@ -78,7 +80,7 @@ class PeerGroup(
     override fun run() {
         running = true
 
-        peerGroupListener?.onStart()
+        peerGroupListeners.forEach { it.onStart() }
 
         while (running) {
             if (connectionManager?.isOnline == true && peerManager.peersCount() < peerSize) {
@@ -92,7 +94,7 @@ class PeerGroup(
             }
         }
 
-        peerGroupListener?.onStop()
+        peerGroupListeners.forEach { it.onStop() }
         logger.info("Closing all peer connections...")
 
         peerManager.disconnectAll()
@@ -107,13 +109,12 @@ class PeerGroup(
         bloomFilterManager.bloomFilter?.let {
             peer.filterLoad(it)
         }
-
-        peerGroupListener?.onPeerConnect(peer)
+        peerGroupListeners.forEach { it.onPeerConnect(peer) }
     }
 
     override fun onReady(peer: Peer) {
         peersQueue.execute {
-            peerGroupListener?.onPeerReady(peer)
+            peerGroupListeners.forEach { it.onPeerReady(peer) }
 
 //            todo check if peer is not syncPeer
             taskQueue.poll()?.let {
@@ -133,7 +134,7 @@ class PeerGroup(
             hostManager.markFailed(peer.host)
         }
 
-        peerGroupListener?.onPeerDisconnect(peer, e)
+        peerGroupListeners.forEach { it.onPeerDisconnect(peer, e) }
 
     }
 
@@ -173,15 +174,11 @@ class PeerGroup(
         if (ip != null) {
             logger.info("Try open new peer connection to $ip...")
             val peer = Peer(ip, network, this)
-            peerGroupListener?.onPeerCreate(peer)
+            peerGroupListeners.forEach { it.onPeerCreate(peer) }
             peer.start()
         } else {
             logger.info("No peers found yet.")
         }
-    }
-
-    fun isRequestingInventory(hash: ByteArray): Boolean {
-        return peerManager.connected().any { peer -> peer.isRequestingInventory(hash) }
     }
 
     fun addTask(peerTask: PeerTask) {

@@ -141,19 +141,14 @@ class BitcoinKitBuilder {
         val peerHostManager = PeerAddressManager(network, storage)
         val bloomFilterManager = BloomFilterManager(realmFactory)
 
-        val transactionSender = TransactionSender()
-
         val peerManager = PeerManager()
-
-        val initialBlockDownload = InitialBlockDownload(BlockSyncer(storage, Blockchain(network, dataProvider), transactionProcessor, addressManager, bloomFilterManager, kitStateProvider, network), peerManager, kitStateProvider)
-        initialBlockDownload.peersSyncedListener = SendTransactionsOnPeersSynced(transactionSender)
 
         val peerGroup = PeerGroup(peerHostManager, bloomFilterManager, network, peerManager, peerSize)
         peerGroup.connectionManager = connectionManager
         peerGroup.peerTaskHandler = peerTaskHandlerChain
         peerGroup.inventoryItemsHandler = inventoryItemsHandlerChain
-        peerGroup.peerGroupListener = initialBlockDownload
 
+        val transactionSender = TransactionSender()
         val transactionBuilder = TransactionBuilder(realmFactory, addressConverter, hdWallet, network, addressManager, unspentOutputProvider)
         val transactionCreator = TransactionCreator(realmFactory, transactionBuilder, transactionProcessor, transactionSender)
 
@@ -216,12 +211,19 @@ class BitcoinKitBuilder {
 
         transactionSyncer = TransactionSyncer(storage, transactionProcessor, addressManager, bloomFilterManager)
 
-        val transactionXxx = TransactionXxx(peerGroup, transactionSyncer!!)
+        transactionSender.peerGroup = peerGroup
+        transactionSender.transactionSyncer = transactionSyncer
 
-        peerTaskHandlerChain.addHandler(transactionXxx)
+        val initialBlockDownload = InitialBlockDownload(BlockSyncer(storage, Blockchain(network, dataProvider), transactionProcessor, addressManager, bloomFilterManager, kitStateProvider, network), peerManager, kitStateProvider)
         peerTaskHandlerChain.addHandler(initialBlockDownload)
-        inventoryItemsHandlerChain.addHandler(transactionXxx)
         inventoryItemsHandlerChain.addHandler(initialBlockDownload)
+        peerGroup.addPeerGroupListener(initialBlockDownload)
+        initialBlockDownload.peersSyncedListener = SendTransactionsOnPeersSynced(transactionSender)
+
+        val mempoolTransactions = MempoolTransactions(transactionSyncer!!)
+        peerTaskHandlerChain.addHandler(mempoolTransactions)
+        inventoryItemsHandlerChain.addHandler(mempoolTransactions)
+        peerGroup.addPeerGroupListener(mempoolTransactions)
 
         return bitcoinKit
     }

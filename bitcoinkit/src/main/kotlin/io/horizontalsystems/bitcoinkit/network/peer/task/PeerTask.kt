@@ -50,10 +50,6 @@ open class PeerTask {
         return false
     }
 
-    open fun isRequestingInventory(hash: ByteArray): Boolean {
-        return false
-    }
-
     open fun handleTimeout() = Unit
 
     fun checkTimeout() {

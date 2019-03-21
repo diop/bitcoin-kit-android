@@ -62,10 +62,6 @@ class Peer(val host: String, private val network: Network, private val listener:
         peerConnection.sendMessage(MempoolMessage())
     }
 
-    fun isRequestingInventory(hash: ByteArray): Boolean {
-        return tasks.any { it.isRequestingInventory(hash) }
-    }
-
     //
     // PeerConnection Listener implementations
     //
