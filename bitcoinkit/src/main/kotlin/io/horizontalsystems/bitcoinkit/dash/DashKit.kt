@@ -43,7 +43,7 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
             this(context, Mnemonic().toSeed(words), networkType, walletId, peerSize, newWallet, confirmationsThreshold)
 
     init {
-        val builder = BitcoinKitBuilder()
+        bitcoinKit = BitcoinKitBuilder()
                 .setContext(context)
                 .setSeed(seed)
                 .setNetworkType(networkType)
@@ -51,17 +51,16 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
                 .setPeerSize(2)
                 .setNewWallet(newWallet)
                 .setConfirmationThreshold(confirmationsThreshold)
+                .build()
 
-        bitcoinKit = builder.build()
+        bitcoinKit.addMessageParser(DashMessageParser())
 
-        builder.addMessageParser(DashMessageParser())
+        val masterNodeSyncer = MasternodeListSyncer(bitcoinKit.peerGroup, PeerTaskFactory(), MasternodeListManager())
+        bitcoinKit.addPeerTaskHandler(masterNodeSyncer)
 
-        val masterNodeSyncer = MasternodeListSyncer(builder.peerGroup, PeerTaskFactory(), MasternodeListManager())
-        builder.addPeerTaskHandler(masterNodeSyncer)
-
-        val instantSend = InstantSend(builder.transactionSyncer)
-        builder.addInventoryItemsHandler(instantSend)
-        builder.addPeerTaskHandler(instantSend)
+        val instantSend = InstantSend(bitcoinKit.transactionSyncer)
+        bitcoinKit.addInventoryItemsHandler(instantSend)
+        bitcoinKit.addPeerTaskHandler(instantSend)
 
         bitcoinKit.listener = this
     }

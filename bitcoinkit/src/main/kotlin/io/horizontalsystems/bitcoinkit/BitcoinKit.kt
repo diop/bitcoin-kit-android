@@ -38,9 +38,6 @@ class BitcoinKitModule
 
 class BitcoinKitBuilder {
 
-    lateinit var peerGroup: PeerGroup
-    lateinit var transactionSyncer: TransactionSyncer
-
     // required parameters
     private var context: Context? = null
     private var seed: ByteArray? = null
@@ -144,8 +141,6 @@ class BitcoinKitBuilder {
 
         val peerGroup = PeerGroup(peerHostManager, network, peerManager, peerSize)
         peerGroup.connectionManager = connectionManager
-        peerGroup.peerTaskHandler = peerTaskHandlerChain
-        peerGroup.inventoryItemsHandler = inventoryItemsHandlerChain
 
         val transactionSyncer = TransactionSyncer(storage, transactionProcessor, addressManager, bloomFilterManager)
 
@@ -208,31 +203,51 @@ class BitcoinKitBuilder {
         dataProvider.listener = bitcoinKit
         kitStateProvider.listener = bitcoinKit
 
-        this.peerGroup = peerGroup
-        this.transactionSyncer = transactionSyncer
+        bitcoinKit.peerGroup = peerGroup
+        bitcoinKit.transactionSyncer = transactionSyncer
+
+        peerGroup.peerTaskHandler = bitcoinKit.peerTaskHandlerChain
+        peerGroup.inventoryItemsHandler = bitcoinKit.inventoryItemsHandlerChain
 
         // this part can be moved to another place
 
         val bloomFilterLoader = BloomFilterLoader(bloomFilterManager)
         bloomFilterManager.listener = bloomFilterLoader
-        peerGroup.addPeerGroupListener(bloomFilterLoader)
+        bitcoinKit.addPeerGroupListener(bloomFilterLoader)
 
         val initialBlockDownload = InitialBlockDownload(BlockSyncer(storage, Blockchain(network, dataProvider), transactionProcessor, addressManager, bloomFilterManager, kitStateProvider, network), peerManager, kitStateProvider)
-        addPeerTaskHandler(initialBlockDownload)
-        addInventoryItemsHandler(initialBlockDownload)
-        peerGroup.addPeerGroupListener(initialBlockDownload)
+        bitcoinKit.addPeerTaskHandler(initialBlockDownload)
+        bitcoinKit.addInventoryItemsHandler(initialBlockDownload)
+        bitcoinKit.addPeerGroupListener(initialBlockDownload)
         initialBlockDownload.peersSyncedListener = SendTransactionsOnPeersSynced(transactionSender)
 
         val mempoolTransactions = MempoolTransactions(transactionSyncer)
-        addPeerTaskHandler(mempoolTransactions)
-        addInventoryItemsHandler(mempoolTransactions)
-        peerGroup.addPeerGroupListener(mempoolTransactions)
+        bitcoinKit.addPeerTaskHandler(mempoolTransactions)
+        bitcoinKit.addInventoryItemsHandler(mempoolTransactions)
+        bitcoinKit.addPeerGroupListener(mempoolTransactions)
 
         return bitcoinKit
     }
 
-    private val inventoryItemsHandlerChain = InventoryItemsHandlerChain()
-    private val peerTaskHandlerChain = PeerTaskHandlerChain()
+}
+
+class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFactory, private val dataProvider: DataProvider, private val addressManager: AddressManager, private val addressConverter: AddressConverter, private val kitStateProvider: KitStateProvider, private val transactionBuilder: TransactionBuilder, private val transactionCreator: TransactionCreator, private val paymentAddressParser: PaymentAddressParser, private val syncManager: SyncManager)
+    : KitStateProvider.Listener, DataProvider.Listener {
+
+    interface Listener {
+        fun onTransactionsUpdate(bitcoinKit: BitcoinKit, inserted: List<TransactionInfo>, updated: List<TransactionInfo>) = Unit
+        fun onTransactionsDelete(hashes: List<String>) = Unit
+        fun onBalanceUpdate(bitcoinKit: BitcoinKit, balance: Long) = Unit
+        fun onLastBlockInfoUpdate(bitcoinKit: BitcoinKit, blockInfo: BlockInfo) = Unit
+        fun onKitStateUpdate(bitcoinKit: BitcoinKit, state: KitState) = Unit
+    }
+
+    // START: Extending
+    lateinit var peerGroup: PeerGroup
+    lateinit var transactionSyncer: TransactionSyncer
+
+    val inventoryItemsHandlerChain = InventoryItemsHandlerChain()
+    val peerTaskHandlerChain = PeerTaskHandlerChain()
 
     fun addMessageParser(messageParser: IMessageParser) {
         messageParser.nextParser = BitcoinMessageParser()
@@ -248,18 +263,11 @@ class BitcoinKitBuilder {
         peerTaskHandlerChain.addHandler(handler)
     }
 
-}
-
-class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFactory, private val dataProvider: DataProvider, private val addressManager: AddressManager, private val addressConverter: AddressConverter, private val kitStateProvider: KitStateProvider, private val transactionBuilder: TransactionBuilder, private val transactionCreator: TransactionCreator, private val paymentAddressParser: PaymentAddressParser, private val syncManager: SyncManager)
-    : KitStateProvider.Listener, DataProvider.Listener {
-
-    interface Listener {
-        fun onTransactionsUpdate(bitcoinKit: BitcoinKit, inserted: List<TransactionInfo>, updated: List<TransactionInfo>) = Unit
-        fun onTransactionsDelete(hashes: List<String>) = Unit
-        fun onBalanceUpdate(bitcoinKit: BitcoinKit, balance: Long) = Unit
-        fun onLastBlockInfoUpdate(bitcoinKit: BitcoinKit, blockInfo: BlockInfo) = Unit
-        fun onKitStateUpdate(bitcoinKit: BitcoinKit, state: KitState) = Unit
+    fun addPeerGroupListener(listener: PeerGroup.IPeerGroupListener) {
+        peerGroup.addPeerGroupListener(listener)
     }
+
+    // END: Extending
 
     var listener: Listener? = null
     var listenerExecutor: Executor = Executors.newSingleThreadExecutor()
