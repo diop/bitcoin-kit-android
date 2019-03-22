@@ -4,12 +4,13 @@ import android.arch.lifecycle.MutableLiveData
 import android.arch.lifecycle.ViewModel
 import io.horizontalsystems.bitcoinkit.BitcoinKit
 import io.horizontalsystems.bitcoinkit.BitcoinKit.KitState
+import io.horizontalsystems.bitcoinkit.BitcoinKitBuilder
 import io.horizontalsystems.bitcoinkit.dash.DashKit
 import io.horizontalsystems.bitcoinkit.models.BlockInfo
 import io.horizontalsystems.bitcoinkit.models.TransactionInfo
 import io.reactivex.disposables.CompositeDisposable
 
-class MainViewModel : ViewModel(), DashKit.Listener {
+class MainViewModel : ViewModel(), BitcoinKit.Listener {
 
     enum class State {
         STARTED, STOPPED
@@ -29,25 +30,35 @@ class MainViewModel : ViewModel(), DashKit.Listener {
             status.value = (if (value) State.STARTED else State.STOPPED)
         }
 
-    private var dashKit: DashKit
+    private var bitcoinKit: BitcoinKit
 
     init {
         val words = listOf("used", "ugly", "meat", "glad", "balance", "divorce", "inner", "artwork", "hire", "invest", "already", "piano")
         val networkType = BitcoinKit.NetworkType.TestNetDash
 
-        dashKit = DashKit(App.instance, words, networkType, "wallet-id", newWallet = true)
-        dashKit.listener = this
+        bitcoinKit = BitcoinKitBuilder()
+                .setContext(App.instance)
+                .setWords(words)
+                .setNetworkType(networkType)
+                .setWalletId("wallet-id")
+                .setPeerSize(2)
+                .setNewWallet(true)
+                .build()
+
+        bitcoinKit.addListener(this)
+
+        DashKit().extendBitcoin(bitcoinKit)
 
         networkName = networkType.name
-        balance.value = dashKit.balance
+        balance.value = bitcoinKit.balance
 
-        dashKit.transactions().subscribe { txList: List<TransactionInfo> ->
+        bitcoinKit.transactions().subscribe { txList: List<TransactionInfo> ->
             transactions.value = txList.sortedByDescending { it.blockHeight }
         }.let {
             disposables.add(it)
         }
 
-        lastBlockHeight.value = dashKit.lastBlockInfo?.height ?: 0
+        lastBlockHeight.value = bitcoinKit.lastBlockInfo?.height ?: 0
         state.value = KitState.NotSynced
 
         started = false
@@ -57,34 +68,34 @@ class MainViewModel : ViewModel(), DashKit.Listener {
         if (started) return
         started = true
 
-        dashKit.start()
+        bitcoinKit.start()
     }
 
     fun clear() {
-        dashKit.clear()
+        bitcoinKit.clear()
     }
 
     fun receiveAddress(): String {
-        return dashKit.receiveAddress()
+        return bitcoinKit.receiveAddress()
     }
 
     fun send(address: String, amount: Long) {
-        dashKit.send(address, amount)
+        bitcoinKit.send(address, amount)
     }
 
     fun fee(value: Long, address: String? = null): Long {
-        return dashKit.fee(value, address)
+        return bitcoinKit.fee(value, address)
     }
 
     fun showDebugInfo() {
-        dashKit.showDebugInfo()
+        bitcoinKit.showDebugInfo()
     }
 
     //
     // BitcoinKit Listener implementations
     //
-    override fun onTransactionsUpdate(inserted: List<TransactionInfo>, updated: List<TransactionInfo>) {
-        dashKit.transactions().subscribe { txList: List<TransactionInfo> ->
+    override fun onTransactionsUpdate(bitcoinKit: BitcoinKit, inserted: List<TransactionInfo>, updated: List<TransactionInfo>) {
+        bitcoinKit.transactions().subscribe { txList: List<TransactionInfo> ->
             transactions.postValue(txList.sortedByDescending { it.blockHeight })
         }.let {
             disposables.add(it)
@@ -94,15 +105,15 @@ class MainViewModel : ViewModel(), DashKit.Listener {
     override fun onTransactionsDelete(hashes: List<String>) {
     }
 
-    override fun onBalanceUpdate(balance: Long) {
+    override fun onBalanceUpdate(bitcoinKit: BitcoinKit, balance: Long) {
         this.balance.postValue(balance)
     }
 
-    override fun onLastBlockInfoUpdate(blockInfo: BlockInfo) {
+    override fun onLastBlockInfoUpdate(bitcoinKit: BitcoinKit, blockInfo: BlockInfo) {
         this.lastBlockHeight.postValue(blockInfo.height)
     }
 
-    override fun onKitStateUpdate(state: KitState) {
+    override fun onKitStateUpdate(bitcoinKit: BitcoinKit, state: KitState) {
         this.state.postValue(state)
     }
 }
