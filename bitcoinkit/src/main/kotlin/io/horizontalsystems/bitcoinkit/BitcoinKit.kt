@@ -142,7 +142,7 @@ class BitcoinKitBuilder {
 
         val peerManager = PeerManager()
 
-        val peerGroup = PeerGroup(peerHostManager, bloomFilterManager, network, peerManager, peerSize)
+        val peerGroup = PeerGroup(peerHostManager, network, peerManager, peerSize)
         peerGroup.connectionManager = connectionManager
         peerGroup.peerTaskHandler = peerTaskHandlerChain
         peerGroup.inventoryItemsHandler = inventoryItemsHandlerChain
@@ -212,6 +212,10 @@ class BitcoinKitBuilder {
         this.transactionSyncer = transactionSyncer
 
         // this part can be moved to another place
+
+        val bloomFilterLoader = BloomFilterLoader(bloomFilterManager)
+        bloomFilterManager.listener = bloomFilterLoader
+        peerGroup.addPeerGroupListener(bloomFilterLoader)
 
         val initialBlockDownload = InitialBlockDownload(BlockSyncer(storage, Blockchain(network, dataProvider), transactionProcessor, addressManager, bloomFilterManager, kitStateProvider, network), peerManager, kitStateProvider)
         addPeerTaskHandler(initialBlockDownload)

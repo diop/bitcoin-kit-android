@@ -1,7 +1,5 @@
 package io.horizontalsystems.bitcoinkit.network.peer
 
-import io.horizontalsystems.bitcoinkit.crypto.BloomFilter
-import io.horizontalsystems.bitcoinkit.managers.BloomFilterManager
 import io.horizontalsystems.bitcoinkit.managers.ConnectionManager
 import io.horizontalsystems.bitcoinkit.models.InventoryItem
 import io.horizontalsystems.bitcoinkit.models.NetworkAddress
@@ -15,10 +13,9 @@ import java.util.logging.Logger
 
 class PeerGroup(
         private val hostManager: PeerAddressManager,
-        private val bloomFilterManager: BloomFilterManager,
         private val network: Network,
         private val peerManager: PeerManager,
-        private val peerSize: Int) : Thread(), Peer.Listener, BloomFilterManager.Listener {
+        private val peerSize: Int) : Thread(), Peer.Listener {
 
     interface IPeerGroupListener {
         fun onStart() = Unit
@@ -40,10 +37,6 @@ class PeerGroup(
     private val peersQueue = Executors.newSingleThreadExecutor()
     private val taskQueue: BlockingQueue<PeerTask> = ArrayBlockingQueue(10)
     private val peerGroupListeners = mutableListOf<IPeerGroupListener>()
-
-    init {
-        bloomFilterManager.listener = this
-    }
 
     fun addPeerGroupListener(listener: IPeerGroupListener) {
         peerGroupListeners.add(listener)
@@ -106,9 +99,6 @@ class PeerGroup(
     override fun onConnect(peer: Peer) {
         peerManager.add(peer)
 
-        bloomFilterManager.bloomFilter?.let {
-            peer.filterLoad(it)
-        }
         peerGroupListeners.forEach { it.onPeerConnect(peer) }
     }
 
@@ -154,15 +144,6 @@ class PeerGroup(
 
     override fun onTaskComplete(peer: Peer, task: PeerTask) {
         peerTaskHandler?.handleCompletedTask(peer, task)
-    }
-
-    //
-    // BloomFilterManager implementations
-    //
-    override fun onFilterUpdated(bloomFilter: BloomFilter) {
-        peerManager.connected().forEach { peer ->
-            peer.filterLoad(bloomFilter)
-        }
     }
 
     //
