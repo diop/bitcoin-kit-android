@@ -269,13 +269,18 @@ class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFa
 
     // END: Extending
 
-    var listener: Listener? = null
     var listenerExecutor: Executor = Executors.newSingleThreadExecutor()
 
     //  DataProvider getters
     val balance get() = dataProvider.balance
     val lastBlockInfo get() = dataProvider.lastBlockInfo
     val syncState get() = kitStateProvider.syncState
+
+    private val listeners = mutableListOf<Listener>()
+
+    fun addListener(listener: Listener) {
+        listeners.add(listener)
+    }
 
     //
     // API methods
@@ -355,25 +360,34 @@ class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFa
     //
     override fun onTransactionsUpdate(inserted: List<TransactionInfo>, updated: List<TransactionInfo>) {
         listenerExecutor.execute {
-            listener?.onTransactionsUpdate(this, inserted, updated)
+            listeners.forEach {
+                it.onTransactionsUpdate(this, inserted, updated)
+            }
         }
     }
 
     override fun onTransactionsDelete(hashes: List<String>) {
         listenerExecutor.execute {
-            listener?.onTransactionsDelete(hashes)
+            listeners.forEach {
+                it.onTransactionsDelete(hashes)
+            }
         }
     }
 
     override fun onBalanceUpdate(balance: Long) {
         listenerExecutor.execute {
-            listener?.onBalanceUpdate(this, balance)
+            listeners.forEach { it ->
+                it.onBalanceUpdate(this, balance)
+            }
+
         }
     }
 
     override fun onLastBlockInfoUpdate(blockInfo: BlockInfo) {
         listenerExecutor.execute {
-            listener?.onLastBlockInfoUpdate(this, blockInfo)
+            listeners.forEach {
+                it.onLastBlockInfoUpdate(this, blockInfo)
+            }
         }
     }
 
@@ -382,7 +396,9 @@ class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFa
     //
     override fun onKitStateUpdate(state: KitState) {
         listenerExecutor.execute {
-            listener?.onKitStateUpdate(this, state)
+            listeners.forEach {
+                it.onKitStateUpdate(this, state)
+            }
         }
     }
 

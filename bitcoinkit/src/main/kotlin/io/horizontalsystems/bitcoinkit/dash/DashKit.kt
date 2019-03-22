@@ -53,6 +53,8 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
                 .setConfirmationThreshold(confirmationsThreshold)
                 .build()
 
+        bitcoinKit.addListener(this)
+
         bitcoinKit.addMessageParser(DashMessageParser())
 
         val masterNodeSyncer = MasternodeListSyncer(bitcoinKit.peerGroup, PeerTaskFactory(), MasternodeListManager())
@@ -62,7 +64,6 @@ class DashKit(context: Context, seed: ByteArray, networkType: BitcoinKit.Network
         bitcoinKit.addInventoryItemsHandler(instantSend)
         bitcoinKit.addPeerTaskHandler(instantSend)
 
-        bitcoinKit.listener = this
     }
 
     fun transactions(fromHash: String? = null, limit: Int? = null): Single<List<TransactionInfo>> {
