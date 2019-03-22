@@ -5,14 +5,12 @@ import io.horizontalsystems.bitcoinkit.network.messages.IMessageParser
 import io.horizontalsystems.bitcoinkit.network.messages.Message
 
 class DashMessageParser : IMessageParser {
-    override var nextParser: IMessageParser? = null
-
     override fun parseMessage(command: String, payload: ByteArray, network: Network): Message? {
         return when (command) {
             "ix" -> TransactionLockMessage(payload)
             "txlvote" -> TransactionLockVoteMessage(payload)
             "mnlistdiff" -> MasternodeListDiffMessage(payload)
-            else -> nextParser?.parseMessage(command, payload, network)
+            else -> null
         }
     }
 }

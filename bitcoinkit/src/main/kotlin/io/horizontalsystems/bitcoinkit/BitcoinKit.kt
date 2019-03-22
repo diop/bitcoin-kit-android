@@ -17,6 +17,7 @@ import io.horizontalsystems.bitcoinkit.network.*
 import io.horizontalsystems.bitcoinkit.network.messages.BitcoinMessageParser
 import io.horizontalsystems.bitcoinkit.network.messages.IMessageParser
 import io.horizontalsystems.bitcoinkit.network.messages.Message
+import io.horizontalsystems.bitcoinkit.network.messages.MessageParserChain
 import io.horizontalsystems.bitcoinkit.network.peer.*
 import io.horizontalsystems.bitcoinkit.storage.KitDatabase
 import io.horizontalsystems.bitcoinkit.storage.Storage
@@ -208,8 +209,11 @@ class BitcoinKitBuilder {
 
         peerGroup.peerTaskHandler = bitcoinKit.peerTaskHandlerChain
         peerGroup.inventoryItemsHandler = bitcoinKit.inventoryItemsHandlerChain
+        Message.Builder.messageParser = bitcoinKit.messageParserChain
 
         // this part can be moved to another place
+
+        bitcoinKit.addMessageParser(BitcoinMessageParser())
 
         val bloomFilterLoader = BloomFilterLoader(bloomFilterManager)
         bloomFilterManager.listener = bloomFilterLoader
@@ -248,11 +252,10 @@ class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFa
 
     val inventoryItemsHandlerChain = InventoryItemsHandlerChain()
     val peerTaskHandlerChain = PeerTaskHandlerChain()
+    val messageParserChain = MessageParserChain()
 
     fun addMessageParser(messageParser: IMessageParser) {
-        messageParser.nextParser = BitcoinMessageParser()
-
-        Message.Builder.messageParser = messageParser
+        messageParserChain.addParser(messageParser)
     }
 
     fun addInventoryItemsHandler(handler: IInventoryItemsHandler) {
