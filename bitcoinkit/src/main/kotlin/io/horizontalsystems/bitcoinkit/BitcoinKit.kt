@@ -13,7 +13,7 @@ import io.horizontalsystems.bitcoinkit.models.BitcoinPaymentData
 import io.horizontalsystems.bitcoinkit.models.BlockInfo
 import io.horizontalsystems.bitcoinkit.models.PublicKey
 import io.horizontalsystems.bitcoinkit.models.TransactionInfo
-import io.horizontalsystems.bitcoinkit.network.*
+import io.horizontalsystems.bitcoinkit.network.Network
 import io.horizontalsystems.bitcoinkit.network.messages.BitcoinMessageParser
 import io.horizontalsystems.bitcoinkit.network.messages.IMessageParser
 import io.horizontalsystems.bitcoinkit.network.messages.Message
@@ -43,7 +43,11 @@ class BitcoinKitBuilder {
     private var context: Context? = null
     private var seed: ByteArray? = null
     private var words: List<String>? = null
-    private var networkType: BitcoinKit.NetworkType? = null
+    private var network: Network? = null
+    private var paymentAddressParser: PaymentAddressParser? = null
+    private var addressConverter: AddressConverter? = null
+    private var addressSelector: IAddressSelector? = null
+    private var apiFeeRate: ApiFeeRate? = null
     private var walletId: String? = null
 
     // parameters with default values
@@ -66,8 +70,28 @@ class BitcoinKitBuilder {
         return this
     }
 
-    fun setNetworkType(networkType: BitcoinKit.NetworkType): BitcoinKitBuilder {
-        this.networkType = networkType
+    fun setNetwork(network: Network): BitcoinKitBuilder {
+        this.network = network
+        return this
+    }
+
+    fun setPaymentAddressParser(paymentAddressParser: PaymentAddressParser): BitcoinKitBuilder {
+        this.paymentAddressParser = paymentAddressParser
+        return this
+    }
+
+    fun setAddressConverter(addressConverter: AddressConverter): BitcoinKitBuilder {
+        this.addressConverter = addressConverter
+        return this
+    }
+
+    fun setAddressSelector(addressSelector: IAddressSelector): BitcoinKitBuilder {
+        this.addressSelector = addressSelector
+        return this
+    }
+
+    fun setApiFeeRate(apiFeeRate: ApiFeeRate): BitcoinKitBuilder {
+        this.apiFeeRate = apiFeeRate
         return this
     }
 
@@ -94,25 +118,23 @@ class BitcoinKitBuilder {
     fun build(): BitcoinKit {
         val context = this.context
         val seed = this.seed ?: words?.let { Mnemonic().toSeed(it) }
-        val networkType = this.networkType
         val walletId = this.walletId
+        val network = this.network
+        val paymentAddressParser = this.paymentAddressParser
+        val addressConverter = this.addressConverter
+        val addressSelector = this.addressSelector
+        val apiFeeRate = this.apiFeeRate
 
         checkNotNull(context)
         checkNotNull(seed)
-        checkNotNull(networkType)
+        checkNotNull(network)
+        checkNotNull(paymentAddressParser)
+        checkNotNull(addressConverter)
+        checkNotNull(addressSelector)
+        checkNotNull(apiFeeRate)
         checkNotNull(walletId)
 
-        val network: Network = when (networkType) {
-            BitcoinKit.NetworkType.MainNet -> MainNet()
-            BitcoinKit.NetworkType.MainNetBitCash -> MainNetBitcoinCash()
-            BitcoinKit.NetworkType.MainNetDash -> MainNetDash()
-            BitcoinKit.NetworkType.TestNet -> TestNet()
-            BitcoinKit.NetworkType.TestNetBitCash -> TestNetBitcoinCash()
-            BitcoinKit.NetworkType.TestNetDash -> TestNetDash()
-            BitcoinKit.NetworkType.RegTest -> RegTest()
-        }
-
-        val dbName = "bitcoinkit-${networkType.name}-$walletId"
+        val dbName = "bitcoinkit-${network.javaClass}-$walletId"
         val database = KitDatabase.getInstance(context, dbName)
         val realmFactory = RealmFactory(dbName)
         val storage = Storage(database, realmFactory)
@@ -124,8 +146,6 @@ class BitcoinKitBuilder {
         val connectionManager = ConnectionManager(context)
 
         val hdWallet = HDWallet(seed, network.coinType)
-
-        val addressConverter = AddressConverter(network)
 
         val addressManager = AddressManager.create(realmFactory, hdWallet, addressConverter)
 
@@ -152,35 +172,7 @@ class BitcoinKitBuilder {
         val transactionBuilder = TransactionBuilder(realmFactory, addressConverter, hdWallet, network, addressManager, unspentOutputProvider)
         val transactionCreator = TransactionCreator(realmFactory, transactionBuilder, transactionProcessor, transactionSender)
 
-        val paymentAddressParser = when (networkType) {
-            BitcoinKit.NetworkType.MainNetDash,
-            BitcoinKit.NetworkType.TestNetDash,
-            BitcoinKit.NetworkType.MainNet,
-            BitcoinKit.NetworkType.TestNet,
-            BitcoinKit.NetworkType.RegTest -> {
-                PaymentAddressParser("bitcoin", removeScheme = true)
-            }
-            BitcoinKit.NetworkType.MainNetBitCash,
-            BitcoinKit.NetworkType.TestNetBitCash -> {
-                PaymentAddressParser("bitcoincash", removeScheme = false)
-            }
-        }
-
-        val addressSelector: IAddressSelector = when (networkType) {
-            BitcoinKit.NetworkType.MainNetDash,
-            BitcoinKit.NetworkType.TestNetDash,
-            BitcoinKit.NetworkType.MainNet,
-            BitcoinKit.NetworkType.TestNet,
-            BitcoinKit.NetworkType.RegTest -> {
-                BitcoinAddressSelector(addressConverter)
-            }
-            BitcoinKit.NetworkType.MainNetBitCash,
-            BitcoinKit.NetworkType.TestNetBitCash -> {
-                BitcoinCashAddressSelector(addressConverter)
-            }
-        }
-
-        val feeRateSyncer = FeeRateSyncer(storage, ApiFeeRate(networkType))
+        val feeRateSyncer = FeeRateSyncer(storage, apiFeeRate)
         val blockHashFetcher = BlockHashFetcher(addressSelector, BCoinApi(network, HttpRequester()), BlockHashFetcherHelper())
         val blockDiscovery = BlockDiscoveryBatch(Wallet(hdWallet), blockHashFetcher, network.checkpointBlock.height)
         val stateManager = StateManager(storage, network, newWallet)
