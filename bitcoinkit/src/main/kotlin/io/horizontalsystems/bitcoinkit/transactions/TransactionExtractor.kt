@@ -4,12 +4,12 @@ import io.horizontalsystems.bitcoinkit.models.PublicKey
 import io.horizontalsystems.bitcoinkit.models.Transaction
 import io.horizontalsystems.bitcoinkit.models.TransactionOutput
 import io.horizontalsystems.bitcoinkit.transactions.scripts.*
-import io.horizontalsystems.bitcoinkit.utils.AddressConverter
+import io.horizontalsystems.bitcoinkit.utils.IAddressConverter
 import io.horizontalsystems.bitcoinkit.utils.Utils
 import io.realm.Realm
 import java.util.*
 
-class TransactionExtractor(private val addressConverter: AddressConverter) {
+class TransactionExtractor(private val addressConverter: IAddressConverter) {
 
     fun extractOutputs(transaction: Transaction, realm: Realm) {
         for (output in transaction.outputs) {

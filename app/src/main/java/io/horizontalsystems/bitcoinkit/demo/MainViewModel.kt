@@ -13,8 +13,10 @@ import io.horizontalsystems.bitcoinkit.managers.IAddressSelector
 import io.horizontalsystems.bitcoinkit.models.BlockInfo
 import io.horizontalsystems.bitcoinkit.models.TransactionInfo
 import io.horizontalsystems.bitcoinkit.network.*
-import io.horizontalsystems.bitcoinkit.utils.AddressConverter
+import io.horizontalsystems.bitcoinkit.utils.Bech32AddressConverter
+import io.horizontalsystems.bitcoinkit.utils.CashAddressConverter
 import io.horizontalsystems.bitcoinkit.utils.PaymentAddressParser
+import io.horizontalsystems.bitcoinkit.utils.SegwitAddressConverter
 import io.reactivex.disposables.CompositeDisposable
 
 class MainViewModel : ViewModel(), BitcoinKit.Listener {
@@ -67,31 +69,27 @@ class MainViewModel : ViewModel(), BitcoinKit.Listener {
             }
         }
 
-        val addressConverter = AddressConverter(network)
-
         val addressSelector: IAddressSelector = when (networkType) {
             BitcoinKit.NetworkType.MainNetDash,
             BitcoinKit.NetworkType.TestNetDash,
             BitcoinKit.NetworkType.MainNet,
             BitcoinKit.NetworkType.TestNet,
             BitcoinKit.NetworkType.RegTest -> {
-                BitcoinAddressSelector(addressConverter)
+                BitcoinAddressSelector()
             }
             BitcoinKit.NetworkType.MainNetBitCash,
             BitcoinKit.NetworkType.TestNetBitCash -> {
-                BitcoinCashAddressSelector(addressConverter)
+                BitcoinCashAddressSelector()
             }
         }
 
         val apiFeeRate = ApiFeeRate(networkType)
-
 
         bitcoinKit = BitcoinKitBuilder()
                 .setContext(App.instance)
                 .setWords(words)
                 .setNetwork(network)
                 .setPaymentAddressParser(paymentAddressParser)
-                .setAddressConverter(addressConverter)
                 .setAddressSelector(addressSelector)
                 .setApiFeeRate(apiFeeRate)
                 .setWalletId("wallet-id")
@@ -100,6 +98,16 @@ class MainViewModel : ViewModel(), BitcoinKit.Listener {
                 .build()
 
         bitcoinKit.addListener(this)
+
+
+        val bech32: Bech32AddressConverter = when (network) {
+            is MainNetBitcoinCash,
+            is TestNetBitcoinCash -> CashAddressConverter(network.addressSegwitHrp)
+            // MainNet, TestNet, RegTest
+            else -> SegwitAddressConverter(network.addressSegwitHrp)
+        }
+
+        bitcoinKit.prependAddressConverter(bech32)
 
         DashKit().extendBitcoin(bitcoinKit)
 

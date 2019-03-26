@@ -12,12 +12,12 @@ import io.horizontalsystems.bitcoinkit.transactions.TransactionSizeCalculator
 import io.horizontalsystems.bitcoinkit.transactions.scripts.OpCodes
 import io.horizontalsystems.bitcoinkit.transactions.scripts.ScriptBuilder
 import io.horizontalsystems.bitcoinkit.transactions.scripts.ScriptType
-import io.horizontalsystems.bitcoinkit.utils.AddressConverter
+import io.horizontalsystems.bitcoinkit.utils.IAddressConverter
 import io.horizontalsystems.hdwalletkit.HDWallet
 import io.realm.Realm
 
 class TransactionBuilder {
-    private val addressConverter: AddressConverter
+    private val addressConverter: IAddressConverter
     private val unspentOutputsSelector: UnspentOutputSelector
     private val unspentOutputProvider: UnspentOutputProvider
     private val scriptBuilder: ScriptBuilder
@@ -25,7 +25,7 @@ class TransactionBuilder {
     private val addressManager: AddressManager
     private val realmFactory: RealmFactory
 
-    constructor(realmFactory: RealmFactory, addressConverter: AddressConverter, wallet: HDWallet, network: Network, addressManager: AddressManager, unspentOutputProvider: UnspentOutputProvider) {
+    constructor(realmFactory: RealmFactory, addressConverter: IAddressConverter, wallet: HDWallet, network: Network, addressManager: AddressManager, unspentOutputProvider: UnspentOutputProvider) {
         this.realmFactory = realmFactory
         this.addressConverter = addressConverter
         this.addressManager = addressManager
@@ -35,7 +35,7 @@ class TransactionBuilder {
         this.inputSigner = InputSigner(wallet, network)
     }
 
-    constructor(realmFactory: RealmFactory, addressConverter: AddressConverter, unspentOutputsSelector: UnspentOutputSelector, unspentOutputProvider: UnspentOutputProvider, scriptBuilder: ScriptBuilder, inputSigner: InputSigner, addressManager: AddressManager) {
+    constructor(realmFactory: RealmFactory, addressConverter: IAddressConverter, unspentOutputsSelector: UnspentOutputSelector, unspentOutputProvider: UnspentOutputProvider, scriptBuilder: ScriptBuilder, inputSigner: InputSigner, addressManager: AddressManager) {
         this.realmFactory = realmFactory
         this.addressManager = addressManager
         this.addressConverter = addressConverter

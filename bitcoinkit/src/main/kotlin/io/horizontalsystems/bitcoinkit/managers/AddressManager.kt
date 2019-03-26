@@ -3,12 +3,12 @@ package io.horizontalsystems.bitcoinkit.managers
 import io.horizontalsystems.bitcoinkit.core.RealmFactory
 import io.horizontalsystems.bitcoinkit.core.publicKey
 import io.horizontalsystems.bitcoinkit.models.PublicKey
-import io.horizontalsystems.bitcoinkit.utils.AddressConverter
+import io.horizontalsystems.bitcoinkit.utils.IAddressConverter
 import io.horizontalsystems.hdwalletkit.HDWallet
 import io.realm.Realm
 import io.realm.Sort
 
-class AddressManager(private val realmFactory: RealmFactory, private val hdWallet: HDWallet, private val addressConverter: AddressConverter) {
+class AddressManager(private val realmFactory: RealmFactory, private val hdWallet: HDWallet, private val addressConverter: IAddressConverter) {
 
     @Throws
     fun changePublicKey(realm: Realm): PublicKey {
@@ -110,7 +110,7 @@ class AddressManager(private val realmFactory: RealmFactory, private val hdWalle
     }
 
     companion object {
-        fun create(realmFactory: RealmFactory, hdWallet: HDWallet, addressConverter: AddressConverter): AddressManager {
+        fun create(realmFactory: RealmFactory, hdWallet: HDWallet, addressConverter: IAddressConverter): AddressManager {
             val addressManager = AddressManager(realmFactory, hdWallet, addressConverter)
             addressManager.fillGap()
             return addressManager

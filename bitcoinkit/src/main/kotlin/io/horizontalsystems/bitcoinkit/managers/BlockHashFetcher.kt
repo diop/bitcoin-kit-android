@@ -5,13 +5,14 @@ import com.eclipsesource.json.JsonObject
 import io.horizontalsystems.bitcoinkit.models.BlockHash
 import io.horizontalsystems.bitcoinkit.models.PublicKey
 import io.horizontalsystems.bitcoinkit.network.*
+import io.horizontalsystems.bitcoinkit.utils.IAddressConverter
 import java.util.logging.Logger
 
-class BlockHashFetcher(private val addressSelector: IAddressSelector, private val bCoinApi: BCoinApi, private val helper: BlockHashFetcherHelper) {
+class BlockHashFetcher(private val addressSelector: IAddressSelector, private val addressConverter: IAddressConverter, private val bCoinApi: BCoinApi, private val helper: BlockHashFetcherHelper) {
 
     fun getBlockHashes(publicKeys: List<PublicKey>): Pair<List<BlockHash>, Int> {
         val addresses = publicKeys.map {
-            addressSelector.getAddressVariants(it)
+            addressSelector.getAddressVariants(addressConverter, it)
         }
 
         val transactions = bCoinApi.getTransactions(addresses.flatten())

@@ -24,7 +24,9 @@ import io.horizontalsystems.bitcoinkit.storage.Storage
 import io.horizontalsystems.bitcoinkit.transactions.*
 import io.horizontalsystems.bitcoinkit.transactions.builder.TransactionBuilder
 import io.horizontalsystems.bitcoinkit.transactions.scripts.ScriptType
-import io.horizontalsystems.bitcoinkit.utils.AddressConverter
+import io.horizontalsystems.bitcoinkit.utils.AddressConverterChain
+import io.horizontalsystems.bitcoinkit.utils.Base58AddressConverter
+import io.horizontalsystems.bitcoinkit.utils.IAddressConverter
 import io.horizontalsystems.bitcoinkit.utils.PaymentAddressParser
 import io.horizontalsystems.hdwalletkit.HDWallet
 import io.horizontalsystems.hdwalletkit.Mnemonic
@@ -45,7 +47,6 @@ class BitcoinKitBuilder {
     private var words: List<String>? = null
     private var network: Network? = null
     private var paymentAddressParser: PaymentAddressParser? = null
-    private var addressConverter: AddressConverter? = null
     private var addressSelector: IAddressSelector? = null
     private var apiFeeRate: ApiFeeRate? = null
     private var walletId: String? = null
@@ -77,11 +78,6 @@ class BitcoinKitBuilder {
 
     fun setPaymentAddressParser(paymentAddressParser: PaymentAddressParser): BitcoinKitBuilder {
         this.paymentAddressParser = paymentAddressParser
-        return this
-    }
-
-    fun setAddressConverter(addressConverter: AddressConverter): BitcoinKitBuilder {
-        this.addressConverter = addressConverter
         return this
     }
 
@@ -121,7 +117,6 @@ class BitcoinKitBuilder {
         val walletId = this.walletId
         val network = this.network
         val paymentAddressParser = this.paymentAddressParser
-        val addressConverter = this.addressConverter
         val addressSelector = this.addressSelector
         val apiFeeRate = this.apiFeeRate
 
@@ -129,10 +124,11 @@ class BitcoinKitBuilder {
         checkNotNull(seed)
         checkNotNull(network)
         checkNotNull(paymentAddressParser)
-        checkNotNull(addressConverter)
         checkNotNull(addressSelector)
         checkNotNull(apiFeeRate)
         checkNotNull(walletId)
+
+        val addressConverter = AddressConverterChain()
 
         val dbName = "bitcoinkit-${network.javaClass}-$walletId"
         val database = KitDatabase.getInstance(context, dbName)
@@ -173,7 +169,7 @@ class BitcoinKitBuilder {
         val transactionCreator = TransactionCreator(realmFactory, transactionBuilder, transactionProcessor, transactionSender)
 
         val feeRateSyncer = FeeRateSyncer(storage, apiFeeRate)
-        val blockHashFetcher = BlockHashFetcher(addressSelector, BCoinApi(network, HttpRequester()), BlockHashFetcherHelper())
+        val blockHashFetcher = BlockHashFetcher(addressSelector, addressConverter, BCoinApi(network, HttpRequester()), BlockHashFetcherHelper())
         val blockDiscovery = BlockDiscoveryBatch(Wallet(hdWallet), blockHashFetcher, network.checkpointBlock.height)
         val stateManager = StateManager(storage, network, newWallet)
         val initialSyncer = InitialSyncer(storage, blockDiscovery, stateManager, addressManager, kitStateProvider)
@@ -203,6 +199,8 @@ class BitcoinKitBuilder {
         peerGroup.inventoryItemsHandler = bitcoinKit.inventoryItemsHandlerChain
         Message.Builder.messageParser = bitcoinKit.messageParserChain
 
+        bitcoinKit.prependAddressConverter(Base58AddressConverter(network.addressVersion, network.addressScriptVersion))
+
         // this part can be moved to another place
 
         bitcoinKit.addMessageParser(BitcoinMessageParser())
@@ -227,7 +225,7 @@ class BitcoinKitBuilder {
 
 }
 
-class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFactory, private val dataProvider: DataProvider, private val addressManager: AddressManager, private val addressConverter: AddressConverter, private val kitStateProvider: KitStateProvider, private val transactionBuilder: TransactionBuilder, private val transactionCreator: TransactionCreator, private val paymentAddressParser: PaymentAddressParser, private val syncManager: SyncManager)
+class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFactory, private val dataProvider: DataProvider, private val addressManager: AddressManager, private val addressConverter: AddressConverterChain, private val kitStateProvider: KitStateProvider, private val transactionBuilder: TransactionBuilder, private val transactionCreator: TransactionCreator, private val paymentAddressParser: PaymentAddressParser, private val syncManager: SyncManager)
     : KitStateProvider.Listener, DataProvider.Listener {
 
     interface Listener {
@@ -260,6 +258,10 @@ class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFa
 
     fun addPeerGroupListener(listener: PeerGroup.IPeerGroupListener) {
         peerGroup.addPeerGroupListener(listener)
+    }
+
+    fun prependAddressConverter(converter: IAddressConverter) {
+        addressConverter.prependConverter(converter)
     }
 
     // END: Extending
