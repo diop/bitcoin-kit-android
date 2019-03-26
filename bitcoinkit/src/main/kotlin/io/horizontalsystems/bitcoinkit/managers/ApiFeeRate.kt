@@ -1,6 +1,6 @@
 package io.horizontalsystems.bitcoinkit.managers
 
-import io.horizontalsystems.bitcoinkit.BitcoinKit.NetworkType
+import io.horizontalsystems.bitcoinkit.BitcoinCore.NetworkType
 import io.horizontalsystems.bitcoinkit.models.FeeRate
 import io.reactivex.Observable
 

@@ -2,9 +2,9 @@ package io.horizontalsystems.bitcoinkit.demo
 
 import android.arch.lifecycle.MutableLiveData
 import android.arch.lifecycle.ViewModel
-import io.horizontalsystems.bitcoinkit.BitcoinKit
-import io.horizontalsystems.bitcoinkit.BitcoinKit.KitState
-import io.horizontalsystems.bitcoinkit.BitcoinKitBuilder
+import io.horizontalsystems.bitcoinkit.BitcoinCore
+import io.horizontalsystems.bitcoinkit.BitcoinCore.KitState
+import io.horizontalsystems.bitcoinkit.BitcoinCoreBuilder
 import io.horizontalsystems.bitcoinkit.dash.DashKit
 import io.horizontalsystems.bitcoinkit.managers.ApiFeeRate
 import io.horizontalsystems.bitcoinkit.managers.BitcoinAddressSelector
@@ -19,7 +19,7 @@ import io.horizontalsystems.bitcoinkit.utils.PaymentAddressParser
 import io.horizontalsystems.bitcoinkit.utils.SegwitAddressConverter
 import io.reactivex.disposables.CompositeDisposable
 
-class MainViewModel : ViewModel(), BitcoinKit.Listener {
+class MainViewModel : ViewModel(), BitcoinCore.Listener {
 
     enum class State {
         STARTED, STOPPED
@@ -39,53 +39,53 @@ class MainViewModel : ViewModel(), BitcoinKit.Listener {
             status.value = (if (value) State.STARTED else State.STOPPED)
         }
 
-    private var bitcoinKit: BitcoinKit
+    private var bitcoinCore: BitcoinCore
 
     init {
         val words = listOf("used", "ugly", "meat", "glad", "balance", "divorce", "inner", "artwork", "hire", "invest", "already", "piano")
-        val networkType = BitcoinKit.NetworkType.TestNetDash
+        val networkType = BitcoinCore.NetworkType.TestNetDash
 
         val network: Network = when (networkType) {
-            BitcoinKit.NetworkType.MainNet -> MainNet()
-            BitcoinKit.NetworkType.MainNetBitCash -> MainNetBitcoinCash()
-            BitcoinKit.NetworkType.MainNetDash -> MainNetDash()
-            BitcoinKit.NetworkType.TestNet -> TestNet()
-            BitcoinKit.NetworkType.TestNetBitCash -> TestNetBitcoinCash()
-            BitcoinKit.NetworkType.TestNetDash -> TestNetDash()
-            BitcoinKit.NetworkType.RegTest -> RegTest()
+            BitcoinCore.NetworkType.MainNet -> MainNet()
+            BitcoinCore.NetworkType.MainNetBitCash -> MainNetBitcoinCash()
+            BitcoinCore.NetworkType.MainNetDash -> MainNetDash()
+            BitcoinCore.NetworkType.TestNet -> TestNet()
+            BitcoinCore.NetworkType.TestNetBitCash -> TestNetBitcoinCash()
+            BitcoinCore.NetworkType.TestNetDash -> TestNetDash()
+            BitcoinCore.NetworkType.RegTest -> RegTest()
         }
 
         val paymentAddressParser = when (networkType) {
-            BitcoinKit.NetworkType.MainNetDash,
-            BitcoinKit.NetworkType.TestNetDash,
-            BitcoinKit.NetworkType.MainNet,
-            BitcoinKit.NetworkType.TestNet,
-            BitcoinKit.NetworkType.RegTest -> {
+            BitcoinCore.NetworkType.MainNetDash,
+            BitcoinCore.NetworkType.TestNetDash,
+            BitcoinCore.NetworkType.MainNet,
+            BitcoinCore.NetworkType.TestNet,
+            BitcoinCore.NetworkType.RegTest -> {
                 PaymentAddressParser("bitcoin", removeScheme = true)
             }
-            BitcoinKit.NetworkType.MainNetBitCash,
-            BitcoinKit.NetworkType.TestNetBitCash -> {
+            BitcoinCore.NetworkType.MainNetBitCash,
+            BitcoinCore.NetworkType.TestNetBitCash -> {
                 PaymentAddressParser("bitcoincash", removeScheme = false)
             }
         }
 
         val addressSelector: IAddressSelector = when (networkType) {
-            BitcoinKit.NetworkType.MainNetDash,
-            BitcoinKit.NetworkType.TestNetDash,
-            BitcoinKit.NetworkType.MainNet,
-            BitcoinKit.NetworkType.TestNet,
-            BitcoinKit.NetworkType.RegTest -> {
+            BitcoinCore.NetworkType.MainNetDash,
+            BitcoinCore.NetworkType.TestNetDash,
+            BitcoinCore.NetworkType.MainNet,
+            BitcoinCore.NetworkType.TestNet,
+            BitcoinCore.NetworkType.RegTest -> {
                 BitcoinAddressSelector()
             }
-            BitcoinKit.NetworkType.MainNetBitCash,
-            BitcoinKit.NetworkType.TestNetBitCash -> {
+            BitcoinCore.NetworkType.MainNetBitCash,
+            BitcoinCore.NetworkType.TestNetBitCash -> {
                 BitcoinCashAddressSelector()
             }
         }
 
         val apiFeeRate = ApiFeeRate(networkType)
 
-        bitcoinKit = BitcoinKitBuilder()
+        bitcoinCore = BitcoinCoreBuilder()
                 .setContext(App.instance)
                 .setWords(words)
                 .setNetwork(network)
@@ -97,7 +97,7 @@ class MainViewModel : ViewModel(), BitcoinKit.Listener {
                 .setNewWallet(true)
                 .build()
 
-        bitcoinKit.addListener(this)
+        bitcoinCore.addListener(this)
 
 
         val bech32: Bech32AddressConverter = when (network) {
@@ -107,20 +107,20 @@ class MainViewModel : ViewModel(), BitcoinKit.Listener {
             else -> SegwitAddressConverter(network.addressSegwitHrp)
         }
 
-        bitcoinKit.prependAddressConverter(bech32)
+        bitcoinCore.prependAddressConverter(bech32)
 
-        DashKit().extendBitcoin(bitcoinKit)
+        DashKit().extendBitcoin(bitcoinCore)
 
         networkName = networkType.name
-        balance.value = bitcoinKit.balance
+        balance.value = bitcoinCore.balance
 
-        bitcoinKit.transactions().subscribe { txList: List<TransactionInfo> ->
+        bitcoinCore.transactions().subscribe { txList: List<TransactionInfo> ->
             transactions.value = txList.sortedByDescending { it.blockHeight }
         }.let {
             disposables.add(it)
         }
 
-        lastBlockHeight.value = bitcoinKit.lastBlockInfo?.height ?: 0
+        lastBlockHeight.value = bitcoinCore.lastBlockInfo?.height ?: 0
         state.value = KitState.NotSynced
 
         started = false
@@ -130,34 +130,34 @@ class MainViewModel : ViewModel(), BitcoinKit.Listener {
         if (started) return
         started = true
 
-        bitcoinKit.start()
+        bitcoinCore.start()
     }
 
     fun clear() {
-        bitcoinKit.clear()
+        bitcoinCore.clear()
     }
 
     fun receiveAddress(): String {
-        return bitcoinKit.receiveAddress()
+        return bitcoinCore.receiveAddress()
     }
 
     fun send(address: String, amount: Long) {
-        bitcoinKit.send(address, amount)
+        bitcoinCore.send(address, amount)
     }
 
     fun fee(value: Long, address: String? = null): Long {
-        return bitcoinKit.fee(value, address)
+        return bitcoinCore.fee(value, address)
     }
 
     fun showDebugInfo() {
-        bitcoinKit.showDebugInfo()
+        bitcoinCore.showDebugInfo()
     }
 
     //
     // BitcoinKit Listener implementations
     //
-    override fun onTransactionsUpdate(bitcoinKit: BitcoinKit, inserted: List<TransactionInfo>, updated: List<TransactionInfo>) {
-        bitcoinKit.transactions().subscribe { txList: List<TransactionInfo> ->
+    override fun onTransactionsUpdate(inserted: List<TransactionInfo>, updated: List<TransactionInfo>) {
+        bitcoinCore.transactions().subscribe { txList: List<TransactionInfo> ->
             transactions.postValue(txList.sortedByDescending { it.blockHeight })
         }.let {
             disposables.add(it)
@@ -167,15 +167,15 @@ class MainViewModel : ViewModel(), BitcoinKit.Listener {
     override fun onTransactionsDelete(hashes: List<String>) {
     }
 
-    override fun onBalanceUpdate(bitcoinKit: BitcoinKit, balance: Long) {
+    override fun onBalanceUpdate(balance: Long) {
         this.balance.postValue(balance)
     }
 
-    override fun onLastBlockInfoUpdate(bitcoinKit: BitcoinKit, blockInfo: BlockInfo) {
+    override fun onLastBlockInfoUpdate(blockInfo: BlockInfo) {
         this.lastBlockHeight.postValue(blockInfo.height)
     }
 
-    override fun onKitStateUpdate(bitcoinKit: BitcoinKit, state: KitState) {
+    override fun onKitStateUpdate(state: KitState) {
         this.state.postValue(state)
     }
 }

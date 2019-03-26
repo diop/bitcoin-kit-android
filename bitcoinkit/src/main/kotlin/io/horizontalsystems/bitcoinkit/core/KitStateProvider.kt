@@ -1,7 +1,7 @@
 package io.horizontalsystems.bitcoinkit.core
 
-import io.horizontalsystems.bitcoinkit.BitcoinKit
-import io.horizontalsystems.bitcoinkit.BitcoinKit.KitState
+import io.horizontalsystems.bitcoinkit.BitcoinCore
+import io.horizontalsystems.bitcoinkit.BitcoinCore.KitState
 
 interface ISyncStateListener {
     fun onSyncStart()
@@ -21,7 +21,7 @@ class KitStateProvider : ISyncStateListener {
     private var initialBestBlockHeight = 0
     private var currentBestBlockHeight = 0
 
-    var syncState: BitcoinKit.KitState = KitState.NotSynced
+    var syncState: BitcoinCore.KitState = KitState.NotSynced
         private set(value) {
             if (value != field) {
                 field = value

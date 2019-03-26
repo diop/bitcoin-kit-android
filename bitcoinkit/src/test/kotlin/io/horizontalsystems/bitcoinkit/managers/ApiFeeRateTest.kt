@@ -4,7 +4,7 @@ import com.eclipsesource.json.JsonObject
 import com.nhaarman.mockito_kotlin.any
 import com.nhaarman.mockito_kotlin.whenever
 import helpers.RxTestRule
-import io.horizontalsystems.bitcoinkit.BitcoinKit.NetworkType
+import io.horizontalsystems.bitcoinkit.BitcoinCore.NetworkType
 import io.horizontalsystems.bitcoinkit.models.FeeRate
 import org.junit.Assert.assertEquals
 import org.junit.Before

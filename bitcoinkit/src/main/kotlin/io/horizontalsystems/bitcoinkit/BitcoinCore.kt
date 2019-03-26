@@ -39,7 +39,7 @@ import java.util.concurrent.Executors
 @RealmModule(library = true, allClasses = true)
 class BitcoinKitModule
 
-class BitcoinKitBuilder {
+class BitcoinCoreBuilder {
 
     // required parameters
     private var context: Context? = null
@@ -56,62 +56,62 @@ class BitcoinKitBuilder {
     private var newWallet = false
     private var peerSize = 10
 
-    fun setContext(context: Context): BitcoinKitBuilder {
+    fun setContext(context: Context): BitcoinCoreBuilder {
         this.context = context
         return this
     }
 
-    fun setSeed(seed: ByteArray): BitcoinKitBuilder {
+    fun setSeed(seed: ByteArray): BitcoinCoreBuilder {
         this.seed = seed
         return this
     }
 
-    fun setWords(words: List<String>): BitcoinKitBuilder {
+    fun setWords(words: List<String>): BitcoinCoreBuilder {
         this.words = words
         return this
     }
 
-    fun setNetwork(network: Network): BitcoinKitBuilder {
+    fun setNetwork(network: Network): BitcoinCoreBuilder {
         this.network = network
         return this
     }
 
-    fun setPaymentAddressParser(paymentAddressParser: PaymentAddressParser): BitcoinKitBuilder {
+    fun setPaymentAddressParser(paymentAddressParser: PaymentAddressParser): BitcoinCoreBuilder {
         this.paymentAddressParser = paymentAddressParser
         return this
     }
 
-    fun setAddressSelector(addressSelector: IAddressSelector): BitcoinKitBuilder {
+    fun setAddressSelector(addressSelector: IAddressSelector): BitcoinCoreBuilder {
         this.addressSelector = addressSelector
         return this
     }
 
-    fun setApiFeeRate(apiFeeRate: ApiFeeRate): BitcoinKitBuilder {
+    fun setApiFeeRate(apiFeeRate: ApiFeeRate): BitcoinCoreBuilder {
         this.apiFeeRate = apiFeeRate
         return this
     }
 
-    fun setWalletId(walletId: String): BitcoinKitBuilder {
+    fun setWalletId(walletId: String): BitcoinCoreBuilder {
         this.walletId = walletId
         return this
     }
 
-    fun setConfirmationThreshold(confirmationsThreshold: Int): BitcoinKitBuilder {
+    fun setConfirmationThreshold(confirmationsThreshold: Int): BitcoinCoreBuilder {
         this.confirmationsThreshold = confirmationsThreshold
         return this
     }
 
-    fun setNewWallet(newWallet: Boolean): BitcoinKitBuilder {
+    fun setNewWallet(newWallet: Boolean): BitcoinCoreBuilder {
         this.newWallet = newWallet
         return this
     }
 
-    fun setPeerSize(peerSize: Int): BitcoinKitBuilder {
+    fun setPeerSize(peerSize: Int): BitcoinCoreBuilder {
         this.peerSize = peerSize
         return this
     }
 
-    fun build(): BitcoinKit {
+    fun build(): BitcoinCore {
         val context = this.context
         val seed = this.seed ?: words?.let { Mnemonic().toSeed(it) }
         val walletId = this.walletId
@@ -177,7 +177,7 @@ class BitcoinKitBuilder {
         val syncManager = SyncManager(connectionManager, feeRateSyncer, peerGroup, initialSyncer)
         initialSyncer.listener = syncManager
 
-        val bitcoinKit = BitcoinKit(
+        val bitcoinCore = BitcoinCore(
                 storage,
                 realmFactory,
                 dataProvider,
@@ -189,51 +189,51 @@ class BitcoinKitBuilder {
                 paymentAddressParser,
                 syncManager)
 
-        dataProvider.listener = bitcoinKit
-        kitStateProvider.listener = bitcoinKit
+        dataProvider.listener = bitcoinCore
+        kitStateProvider.listener = bitcoinCore
 
-        bitcoinKit.peerGroup = peerGroup
-        bitcoinKit.transactionSyncer = transactionSyncer
+        bitcoinCore.peerGroup = peerGroup
+        bitcoinCore.transactionSyncer = transactionSyncer
 
-        peerGroup.peerTaskHandler = bitcoinKit.peerTaskHandlerChain
-        peerGroup.inventoryItemsHandler = bitcoinKit.inventoryItemsHandlerChain
-        Message.Builder.messageParser = bitcoinKit.messageParserChain
+        peerGroup.peerTaskHandler = bitcoinCore.peerTaskHandlerChain
+        peerGroup.inventoryItemsHandler = bitcoinCore.inventoryItemsHandlerChain
+        Message.Builder.messageParser = bitcoinCore.messageParserChain
 
-        bitcoinKit.prependAddressConverter(Base58AddressConverter(network.addressVersion, network.addressScriptVersion))
+        bitcoinCore.prependAddressConverter(Base58AddressConverter(network.addressVersion, network.addressScriptVersion))
 
         // this part can be moved to another place
 
-        bitcoinKit.addMessageParser(BitcoinMessageParser())
+        bitcoinCore.addMessageParser(BitcoinMessageParser())
 
         val bloomFilterLoader = BloomFilterLoader(bloomFilterManager)
         bloomFilterManager.listener = bloomFilterLoader
-        bitcoinKit.addPeerGroupListener(bloomFilterLoader)
+        bitcoinCore.addPeerGroupListener(bloomFilterLoader)
 
         val initialBlockDownload = InitialBlockDownload(BlockSyncer(storage, Blockchain(network, dataProvider), transactionProcessor, addressManager, bloomFilterManager, kitStateProvider, network), peerManager, kitStateProvider)
-        bitcoinKit.addPeerTaskHandler(initialBlockDownload)
-        bitcoinKit.addInventoryItemsHandler(initialBlockDownload)
-        bitcoinKit.addPeerGroupListener(initialBlockDownload)
+        bitcoinCore.addPeerTaskHandler(initialBlockDownload)
+        bitcoinCore.addInventoryItemsHandler(initialBlockDownload)
+        bitcoinCore.addPeerGroupListener(initialBlockDownload)
         initialBlockDownload.peersSyncedListener = SendTransactionsOnPeersSynced(transactionSender)
 
         val mempoolTransactions = MempoolTransactions(transactionSyncer)
-        bitcoinKit.addPeerTaskHandler(mempoolTransactions)
-        bitcoinKit.addInventoryItemsHandler(mempoolTransactions)
-        bitcoinKit.addPeerGroupListener(mempoolTransactions)
+        bitcoinCore.addPeerTaskHandler(mempoolTransactions)
+        bitcoinCore.addInventoryItemsHandler(mempoolTransactions)
+        bitcoinCore.addPeerGroupListener(mempoolTransactions)
 
-        return bitcoinKit
+        return bitcoinCore
     }
 
 }
 
-class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFactory, private val dataProvider: DataProvider, private val addressManager: AddressManager, private val addressConverter: AddressConverterChain, private val kitStateProvider: KitStateProvider, private val transactionBuilder: TransactionBuilder, private val transactionCreator: TransactionCreator, private val paymentAddressParser: PaymentAddressParser, private val syncManager: SyncManager)
+class BitcoinCore(private val storage: Storage, private val realmFactory: RealmFactory, private val dataProvider: DataProvider, private val addressManager: AddressManager, private val addressConverter: AddressConverterChain, private val kitStateProvider: KitStateProvider, private val transactionBuilder: TransactionBuilder, private val transactionCreator: TransactionCreator, private val paymentAddressParser: PaymentAddressParser, private val syncManager: SyncManager)
     : KitStateProvider.Listener, DataProvider.Listener {
 
     interface Listener {
-        fun onTransactionsUpdate(bitcoinKit: BitcoinKit, inserted: List<TransactionInfo>, updated: List<TransactionInfo>) = Unit
+        fun onTransactionsUpdate(inserted: List<TransactionInfo>, updated: List<TransactionInfo>) = Unit
         fun onTransactionsDelete(hashes: List<String>) = Unit
-        fun onBalanceUpdate(bitcoinKit: BitcoinKit, balance: Long) = Unit
-        fun onLastBlockInfoUpdate(bitcoinKit: BitcoinKit, blockInfo: BlockInfo) = Unit
-        fun onKitStateUpdate(bitcoinKit: BitcoinKit, state: KitState) = Unit
+        fun onBalanceUpdate(balance: Long) = Unit
+        fun onLastBlockInfoUpdate(blockInfo: BlockInfo) = Unit
+        fun onKitStateUpdate(state: KitState) = Unit
     }
 
     // START: Extending
@@ -358,7 +358,7 @@ class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFa
     override fun onTransactionsUpdate(inserted: List<TransactionInfo>, updated: List<TransactionInfo>) {
         listenerExecutor.execute {
             listeners.forEach {
-                it.onTransactionsUpdate(this, inserted, updated)
+                it.onTransactionsUpdate(inserted, updated)
             }
         }
     }
@@ -374,7 +374,7 @@ class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFa
     override fun onBalanceUpdate(balance: Long) {
         listenerExecutor.execute {
             listeners.forEach { it ->
-                it.onBalanceUpdate(this, balance)
+                it.onBalanceUpdate(balance)
             }
 
         }
@@ -383,7 +383,7 @@ class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFa
     override fun onLastBlockInfoUpdate(blockInfo: BlockInfo) {
         listenerExecutor.execute {
             listeners.forEach {
-                it.onLastBlockInfoUpdate(this, blockInfo)
+                it.onLastBlockInfoUpdate(blockInfo)
             }
         }
     }
@@ -394,7 +394,7 @@ class BitcoinKit(private val storage: Storage, private val realmFactory: RealmFa
     override fun onKitStateUpdate(state: KitState) {
         listenerExecutor.execute {
             listeners.forEach {
-                it.onKitStateUpdate(this, state)
+                it.onKitStateUpdate(state)
             }
         }
     }
