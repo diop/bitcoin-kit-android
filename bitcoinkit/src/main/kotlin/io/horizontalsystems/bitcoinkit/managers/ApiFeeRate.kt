@@ -1,20 +1,10 @@
 package io.horizontalsystems.bitcoinkit.managers
 
-import io.horizontalsystems.bitcoinkit.BitcoinCore.NetworkType
 import io.horizontalsystems.bitcoinkit.models.FeeRate
 import io.reactivex.Observable
 
-class ApiFeeRate(networkType: NetworkType) {
+class ApiFeeRate(private val resource: String) {
     private val apiManager = ApiManager("https://ipfs.horizontalsystems.xyz")
-    private val resource = when (networkType) {
-        NetworkType.MainNetDash -> "DASH"
-        NetworkType.TestNetDash -> "DASH/testnet"
-        NetworkType.MainNet -> "BTC"
-        NetworkType.TestNet -> "BTC/testnet"
-        NetworkType.RegTest -> "BTC/regtest"
-        NetworkType.MainNetBitCash -> "BCH"
-        NetworkType.TestNetBitCash -> "BCH/testnet"
-    }
 
     fun getFeeRate(): Observable<FeeRate> {
         return Observable.create { subscriber ->
