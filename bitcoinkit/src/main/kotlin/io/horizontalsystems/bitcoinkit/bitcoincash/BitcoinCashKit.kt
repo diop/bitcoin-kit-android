@@ -4,7 +4,6 @@ import android.content.Context
 import io.horizontalsystems.bitcoinkit.AbstractKit
 import io.horizontalsystems.bitcoinkit.BitcoinCore
 import io.horizontalsystems.bitcoinkit.BitcoinCoreBuilder
-import io.horizontalsystems.bitcoinkit.managers.ApiFeeRate
 import io.horizontalsystems.bitcoinkit.managers.BitcoinCashAddressSelector
 import io.horizontalsystems.bitcoinkit.network.MainNetBitcoinCash
 import io.horizontalsystems.bitcoinkit.network.Network
@@ -33,9 +32,7 @@ class BitcoinCashKit : AbstractKit {
 
         val addressSelector = BitcoinCashAddressSelector()
 
-        val resource = if (testMode) "BCH/testnet" else "BCH"
-
-        val apiFeeRate = ApiFeeRate(resource)
+        val apiFeeRateResource = if (testMode) "BCH/testnet" else "BCH"
 
         bitcoinCore = BitcoinCoreBuilder()
                 .setContext(context)
@@ -43,7 +40,7 @@ class BitcoinCashKit : AbstractKit {
                 .setNetwork(network)
                 .setPaymentAddressParser(paymentAddressParser)
                 .setAddressSelector(addressSelector)
-                .setApiFeeRate(apiFeeRate)
+                .setApiFeeRateResource(apiFeeRateResource)
                 .setWalletId(walletId)
                 .setPeerSize(2)
                 .setNewWallet(true)

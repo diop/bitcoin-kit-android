@@ -48,7 +48,7 @@ class BitcoinCoreBuilder {
     private var network: Network? = null
     private var paymentAddressParser: PaymentAddressParser? = null
     private var addressSelector: IAddressSelector? = null
-    private var apiFeeRate: ApiFeeRate? = null
+    private var apiFeeRateResource: String? = null
     private var walletId: String? = null
 
     // parameters with default values
@@ -86,8 +86,8 @@ class BitcoinCoreBuilder {
         return this
     }
 
-    fun setApiFeeRate(apiFeeRate: ApiFeeRate): BitcoinCoreBuilder {
-        this.apiFeeRate = apiFeeRate
+    fun setApiFeeRateResource(apiFeeRateResource: String): BitcoinCoreBuilder {
+        this.apiFeeRateResource = apiFeeRateResource
         return this
     }
 
@@ -112,21 +112,15 @@ class BitcoinCoreBuilder {
     }
 
     fun build(): BitcoinCore {
-        val context = this.context
-        val seed = this.seed ?: words?.let { Mnemonic().toSeed(it) }
-        val walletId = this.walletId
-        val network = this.network
-        val paymentAddressParser = this.paymentAddressParser
-        val addressSelector = this.addressSelector
-        val apiFeeRate = this.apiFeeRate
+        val context = checkNotNull(this.context)
+        val seed = checkNotNull(this.seed ?: words?.let { Mnemonic().toSeed(it) })
+        val walletId = checkNotNull(this.walletId)
+        val network = checkNotNull(this.network)
+        val paymentAddressParser = checkNotNull(this.paymentAddressParser)
+        val addressSelector = checkNotNull(this.addressSelector)
+        val apiFeeRateResource = checkNotNull(this.apiFeeRateResource)
 
-        checkNotNull(context)
-        checkNotNull(seed)
-        checkNotNull(network)
-        checkNotNull(paymentAddressParser)
-        checkNotNull(addressSelector)
-        checkNotNull(apiFeeRate)
-        checkNotNull(walletId)
+        val apiFeeRate = ApiFeeRate(apiFeeRateResource)
 
         val addressConverter = AddressConverterChain()
 
@@ -397,16 +391,6 @@ class BitcoinCore(private val storage: Storage, private val realmFactory: RealmF
                 it.onKitStateUpdate(state)
             }
         }
-    }
-
-    enum class NetworkType {
-        MainNet,
-        TestNet,
-        RegTest,
-        MainNetBitCash,
-        TestNetBitCash,
-        MainNetDash,
-        TestNetDash
     }
 
     sealed class KitState {

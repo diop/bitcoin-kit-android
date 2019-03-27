@@ -9,7 +9,6 @@ import io.horizontalsystems.bitcoinkit.dash.managers.MasternodeListManager
 import io.horizontalsystems.bitcoinkit.dash.managers.MasternodeListSyncer
 import io.horizontalsystems.bitcoinkit.dash.messages.DashMessageParser
 import io.horizontalsystems.bitcoinkit.dash.tasks.PeerTaskFactory
-import io.horizontalsystems.bitcoinkit.managers.ApiFeeRate
 import io.horizontalsystems.bitcoinkit.managers.BitcoinAddressSelector
 import io.horizontalsystems.bitcoinkit.models.BlockInfo
 import io.horizontalsystems.bitcoinkit.network.MainNetDash
@@ -40,9 +39,7 @@ class DashKit : AbstractKit, BitcoinCore.Listener {
 
         val addressSelector = BitcoinAddressSelector()
 
-        val resource = if (testMode) "DASH/testnet" else "DASH"
-
-        val apiFeeRate = ApiFeeRate(resource)
+        val apiFeeRateResource = if (testMode) "DASH/testnet" else "DASH"
 
         bitcoinCore = BitcoinCoreBuilder()
                 .setContext(context)
@@ -50,7 +47,7 @@ class DashKit : AbstractKit, BitcoinCore.Listener {
                 .setNetwork(network)
                 .setPaymentAddressParser(paymentAddressParser)
                 .setAddressSelector(addressSelector)
-                .setApiFeeRate(apiFeeRate)
+                .setApiFeeRateResource(apiFeeRateResource)
                 .setWalletId(walletId)
                 .setPeerSize(2)
                 .setNewWallet(true)
