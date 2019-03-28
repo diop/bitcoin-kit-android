@@ -1,13 +1,16 @@
 package io.horizontalsystems.bitcoinkit.bitcoin
 
+import android.arch.persistence.room.Room
 import android.content.Context
 import io.horizontalsystems.bitcoinkit.AbstractKit
 import io.horizontalsystems.bitcoinkit.BitcoinCore
 import io.horizontalsystems.bitcoinkit.BitcoinCoreBuilder
+import io.horizontalsystems.bitcoinkit.dash.storage.DashKitDatabase
 import io.horizontalsystems.bitcoinkit.managers.BitcoinAddressSelector
 import io.horizontalsystems.bitcoinkit.network.MainNet
 import io.horizontalsystems.bitcoinkit.network.Network
 import io.horizontalsystems.bitcoinkit.network.TestNet
+import io.horizontalsystems.bitcoinkit.storage.Storage
 import io.horizontalsystems.bitcoinkit.utils.PaymentAddressParser
 import io.horizontalsystems.bitcoinkit.utils.SegwitAddressConverter
 
@@ -28,6 +31,16 @@ class BitcoinKit : AbstractKit {
 
         network = if (testMode) TestNet() else MainNet()
 
+        val databaseName = "bitcoinkit-${network.javaClass}-$walletId"
+
+        val database = Room.databaseBuilder(context, DashKitDatabase::class.java, databaseName)
+                .fallbackToDestructiveMigration()
+                .allowMainThreadQueries()
+                .addMigrations()
+                .build()
+
+        val storage = Storage(database, databaseName)
+
         val paymentAddressParser = PaymentAddressParser("bitcoin", removeScheme = true)
 
         val addressSelector = BitcoinAddressSelector()
@@ -44,6 +57,7 @@ class BitcoinKit : AbstractKit {
                 .setWalletId(walletId)
                 .setPeerSize(2)
                 .setNewWallet(true)
+                .setStorage(storage)
                 .build()
 
         extendBitcoin(bitcoinCore, network)

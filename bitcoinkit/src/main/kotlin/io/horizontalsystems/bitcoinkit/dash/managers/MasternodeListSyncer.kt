@@ -10,7 +10,7 @@ import io.horizontalsystems.bitcoinkit.network.peer.task.PeerTask
 class MasternodeListSyncer(private val peerGroup: PeerGroup, val peerTaskFactory: PeerTaskFactory, private val masternodeListManager: MasternodeListManager) : IPeerTaskHandler {
 
     fun sync(blockHash: ByteArray) {
-        addTask(masternodeListManager.getBaseBlockHash(), blockHash)
+        addTask(masternodeListManager.baseBlockHash, blockHash)
     }
 
     override fun handleCompletedTask(peer: Peer, task: PeerTask): Boolean {
@@ -19,7 +19,7 @@ class MasternodeListSyncer(private val peerGroup: PeerGroup, val peerTaskFactory
                 task.masternodeListDiffMessage?.let { masternodeListDiffMessage ->
                     try {
                         masternodeListManager.updateList(masternodeListDiffMessage)
-                    } catch (e: InvalidMasternodeListException) {
+                    } catch (e: MasternodeListManager.ValidationError) {
                         peer.close(e)
 
                         addTask(masternodeListDiffMessage.baseBlockHash, masternodeListDiffMessage.blockHash)

@@ -7,7 +7,9 @@ import io.realm.Realm
 import io.realm.RealmResults
 import io.realm.Sort
 
-class Storage(private val store: KitDatabase, val realmFactory: RealmFactory) : IStorage {
+open class Storage(protected open val store: KitDatabase, databaseName: String) : IStorage {
+
+    override val realmFactory = RealmFactory(databaseName)
 
     override fun inTransaction(callback: (Realm) -> Unit) {
         realmFactory.realm.use { realm ->

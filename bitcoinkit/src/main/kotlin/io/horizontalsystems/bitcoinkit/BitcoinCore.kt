@@ -4,10 +4,7 @@ import android.content.Context
 import io.horizontalsystems.bitcoinkit.blocks.BlockSyncer
 import io.horizontalsystems.bitcoinkit.blocks.Blockchain
 import io.horizontalsystems.bitcoinkit.blocks.InitialBlockDownload
-import io.horizontalsystems.bitcoinkit.core.DataProvider
-import io.horizontalsystems.bitcoinkit.core.KitStateProvider
-import io.horizontalsystems.bitcoinkit.core.RealmFactory
-import io.horizontalsystems.bitcoinkit.core.Wallet
+import io.horizontalsystems.bitcoinkit.core.*
 import io.horizontalsystems.bitcoinkit.managers.*
 import io.horizontalsystems.bitcoinkit.models.BitcoinPaymentData
 import io.horizontalsystems.bitcoinkit.models.BlockInfo
@@ -19,8 +16,6 @@ import io.horizontalsystems.bitcoinkit.network.messages.IMessageParser
 import io.horizontalsystems.bitcoinkit.network.messages.Message
 import io.horizontalsystems.bitcoinkit.network.messages.MessageParserChain
 import io.horizontalsystems.bitcoinkit.network.peer.*
-import io.horizontalsystems.bitcoinkit.storage.KitDatabase
-import io.horizontalsystems.bitcoinkit.storage.Storage
 import io.horizontalsystems.bitcoinkit.transactions.*
 import io.horizontalsystems.bitcoinkit.transactions.builder.TransactionBuilder
 import io.horizontalsystems.bitcoinkit.transactions.scripts.ScriptType
@@ -50,6 +45,7 @@ class BitcoinCoreBuilder {
     private var addressSelector: IAddressSelector? = null
     private var apiFeeRateResource: String? = null
     private var walletId: String? = null
+    private var storage: IStorage? = null
 
     // parameters with default values
     private var confirmationsThreshold = 6
@@ -111,6 +107,11 @@ class BitcoinCoreBuilder {
         return this
     }
 
+    fun setStorage(storage: IStorage): BitcoinCoreBuilder {
+        this.storage = storage
+        return this
+    }
+
     fun build(): BitcoinCore {
         val context = checkNotNull(this.context)
         val seed = checkNotNull(this.seed ?: words?.let { Mnemonic().toSeed(it) })
@@ -119,15 +120,13 @@ class BitcoinCoreBuilder {
         val paymentAddressParser = checkNotNull(this.paymentAddressParser)
         val addressSelector = checkNotNull(this.addressSelector)
         val apiFeeRateResource = checkNotNull(this.apiFeeRateResource)
+        val storage = checkNotNull(this.storage)
 
         val apiFeeRate = ApiFeeRate(apiFeeRateResource)
 
         val addressConverter = AddressConverterChain()
 
-        val dbName = "bitcoinkit-${network.javaClass}-$walletId"
-        val database = KitDatabase.getInstance(context, dbName)
-        val realmFactory = RealmFactory(dbName)
-        val storage = Storage(database, realmFactory)
+        val realmFactory = storage.realmFactory
 
         val unspentOutputProvider = UnspentOutputProvider(realmFactory, confirmationsThreshold)
 
@@ -219,7 +218,7 @@ class BitcoinCoreBuilder {
 
 }
 
-class BitcoinCore(private val storage: Storage, private val realmFactory: RealmFactory, private val dataProvider: DataProvider, private val addressManager: AddressManager, private val addressConverter: AddressConverterChain, private val kitStateProvider: KitStateProvider, private val transactionBuilder: TransactionBuilder, private val transactionCreator: TransactionCreator, private val paymentAddressParser: PaymentAddressParser, private val syncManager: SyncManager)
+class BitcoinCore(private val storage: IStorage, private val realmFactory: RealmFactory, private val dataProvider: DataProvider, private val addressManager: AddressManager, private val addressConverter: AddressConverterChain, private val kitStateProvider: KitStateProvider, private val transactionBuilder: TransactionBuilder, private val transactionCreator: TransactionCreator, private val paymentAddressParser: PaymentAddressParser, private val syncManager: SyncManager)
     : KitStateProvider.Listener, DataProvider.Listener {
 
     interface Listener {

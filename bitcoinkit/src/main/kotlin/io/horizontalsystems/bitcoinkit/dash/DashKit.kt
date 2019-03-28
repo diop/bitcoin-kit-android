@@ -1,5 +1,6 @@
 package io.horizontalsystems.bitcoinkit.dash
 
+import android.arch.persistence.room.Room
 import android.content.Context
 import io.horizontalsystems.bitcoinkit.AbstractKit
 import io.horizontalsystems.bitcoinkit.BitcoinCore
@@ -7,13 +8,23 @@ import io.horizontalsystems.bitcoinkit.BitcoinCoreBuilder
 import io.horizontalsystems.bitcoinkit.core.hexStringToByteArray
 import io.horizontalsystems.bitcoinkit.dash.managers.MasternodeListManager
 import io.horizontalsystems.bitcoinkit.dash.managers.MasternodeListSyncer
+import io.horizontalsystems.bitcoinkit.dash.managers.MasternodeSortedList
+import io.horizontalsystems.bitcoinkit.dash.masternodelist.MasternodeCbTxHasher
+import io.horizontalsystems.bitcoinkit.dash.masternodelist.MasternodeListMerkleRootCalculator
+import io.horizontalsystems.bitcoinkit.dash.masternodelist.MerkleRootCreator
+import io.horizontalsystems.bitcoinkit.dash.masternodelist.MerkleRootHasher
 import io.horizontalsystems.bitcoinkit.dash.messages.DashMessageParser
+import io.horizontalsystems.bitcoinkit.dash.models.CoinbaseTransactionSerializer
+import io.horizontalsystems.bitcoinkit.dash.models.MasternodeSerializer
+import io.horizontalsystems.bitcoinkit.dash.storage.DashKitDatabase
+import io.horizontalsystems.bitcoinkit.dash.storage.DashStorage
 import io.horizontalsystems.bitcoinkit.dash.tasks.PeerTaskFactory
 import io.horizontalsystems.bitcoinkit.managers.BitcoinAddressSelector
 import io.horizontalsystems.bitcoinkit.models.BlockInfo
 import io.horizontalsystems.bitcoinkit.network.MainNetDash
 import io.horizontalsystems.bitcoinkit.network.Network
 import io.horizontalsystems.bitcoinkit.network.TestNetDash
+import io.horizontalsystems.bitcoinkit.utils.MerkleBranch
 import io.horizontalsystems.bitcoinkit.utils.PaymentAddressParser
 
 class DashKit : AbstractKit, BitcoinCore.Listener {
@@ -29,11 +40,23 @@ class DashKit : AbstractKit, BitcoinCore.Listener {
             value?.let { bitcoinCore.addListener(it) }
         }
 
+    private val database: DashKitDatabase
+    private val storage: DashStorage
     private var masterNodeSyncer: MasternodeListSyncer? = null
 
     constructor(context: Context, words: List<String>, walletId: String = "wallet-id", testMode: Boolean = false) {
 
         network = if (testMode) TestNetDash() else MainNetDash()
+
+        val databaseName = "bitcoinkit-${network.javaClass}-$walletId"
+
+        database = Room.databaseBuilder(context, DashKitDatabase::class.java, databaseName)
+                .fallbackToDestructiveMigration()
+                .allowMainThreadQueries()
+                .addMigrations()
+                .build()
+
+        storage = DashStorage(database, databaseName)
 
         val paymentAddressParser = PaymentAddressParser("bitcoin", removeScheme = true)
 
@@ -50,6 +73,7 @@ class DashKit : AbstractKit, BitcoinCore.Listener {
                 .setApiFeeRateResource(apiFeeRateResource)
                 .setWalletId(walletId)
                 .setPeerSize(2)
+                .setStorage(storage)
                 .setNewWallet(true)
                 .build()
 
@@ -61,7 +85,13 @@ class DashKit : AbstractKit, BitcoinCore.Listener {
 
         bitcoinCore.addMessageParser(DashMessageParser())
 
-        val masterNodeSyncer = MasternodeListSyncer(bitcoinCore.peerGroup, PeerTaskFactory(), MasternodeListManager())
+        val merkleRootHasher = MerkleRootHasher()
+        val merkleRootCreator = MerkleRootCreator(merkleRootHasher)
+        val masternodeListMerkleRootCalculator = MasternodeListMerkleRootCalculator(MasternodeSerializer(), merkleRootHasher, merkleRootCreator)
+        val masternodeCbTxHasher = MasternodeCbTxHasher(CoinbaseTransactionSerializer(), merkleRootHasher)
+
+        val masternodeListManager = MasternodeListManager(storage, masternodeListMerkleRootCalculator, masternodeCbTxHasher, MerkleBranch(), MasternodeSortedList())
+        val masterNodeSyncer = MasternodeListSyncer(bitcoinCore.peerGroup, PeerTaskFactory(), masternodeListManager)
         bitcoinCore.addPeerTaskHandler(masterNodeSyncer)
 
         this.masterNodeSyncer = masterNodeSyncer

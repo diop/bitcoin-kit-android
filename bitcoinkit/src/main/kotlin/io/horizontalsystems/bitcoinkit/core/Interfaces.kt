@@ -18,6 +18,8 @@ interface IStorage {
     //  BlockchainState
 
     val initialRestored: Boolean?
+    val realmFactory: RealmFactory
+
     fun setInitialRestored(isRestored: Boolean)
 
     //  PeerAddress

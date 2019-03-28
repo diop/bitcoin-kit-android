@@ -2,7 +2,6 @@ package io.horizontalsystems.bitcoinkit.dash
 
 import com.nhaarman.mockito_kotlin.verify
 import com.nhaarman.mockito_kotlin.whenever
-import io.horizontalsystems.bitcoinkit.dash.managers.InvalidMasternodeListException
 import io.horizontalsystems.bitcoinkit.dash.managers.MasternodeListManager
 import io.horizontalsystems.bitcoinkit.dash.managers.MasternodeListSyncer
 import io.horizontalsystems.bitcoinkit.dash.messages.MasternodeListDiffMessage
@@ -26,7 +25,7 @@ class MasterNodeListSyncerTest {
         val blockHash = byteArrayOf(1, 2, 3)
         val task = mock(RequestMasternodeListDiffTask::class.java)
 
-        whenever(masterNodeListManager.getBaseBlockHash()).thenReturn(baseBlockHash)
+        whenever(masterNodeListManager.baseBlockHash).thenReturn(baseBlockHash)
         whenever(peerTaskFactory.createRequestMasternodeListDiffTask(baseBlockHash, blockHash)).thenReturn(task)
 
         syncer.sync(blockHash)
@@ -53,7 +52,7 @@ class MasterNodeListSyncerTest {
         val newTask = mock(RequestMasternodeListDiffTask::class.java)
         val peer = mock(Peer::class.java)
         val masternodeListDiffMessage = mock(MasternodeListDiffMessage::class.java)
-        val verificationException = InvalidMasternodeListException()
+        val verificationException = MasternodeListManager.ValidationError()
         val baseBlockHash = byteArrayOf(1, 2, 3)
         val blockHash = byteArrayOf(4, 5, 6)
 

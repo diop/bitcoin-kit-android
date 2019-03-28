@@ -8,5 +8,5 @@ class CoinbaseTransaction(input: BitcoinInput) {
     val coinbaseTransactionSize = input.readVarInt()
     val version = input.readUnsignedShort()
     val height = input.readUnsignedInt()
-    val merkleRootMNList = input.readBytes(32)
+    val merkleRootMNList: ByteArray = input.readBytes(32)
 }
