@@ -12,6 +12,7 @@ class BloomFilterLoader(private val bloomFilterManager: BloomFilterManager) : IP
         bloomFilterManager.bloomFilter?.let {
             peer.filterLoad(it)
         }
+        peers.add(peer)
     }
 
     override fun onPeerDisconnect(peer: Peer, e: Exception?) {
